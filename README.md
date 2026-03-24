@@ -55,9 +55,11 @@ Ejecuta el archivo principal para iniciar el servidor de desarrollo:
 ```bash
 python app.py
 ```
+O dale play desde Visual.
 
 ### 6. Usar la aplicación
 Abre tu navegador web de preferencia y navega a la siguiente dirección: 
 👉 **[http://localhost:5000](http://localhost:5000)**
+👉 **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
 
 Para detener la ejecución del servidor local, simplemente presiona `Ctrl + C` en tu terminal.
