@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Métodos Numéricos — Modelado y Simulación</title>
+  <meta name="description" content="Interfaz web para ejecutar métodos numéricos con calculadora científica visual y gráficos interactivos." />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <h1>Métodos Numéricos</h1>
+    <p>Modelado y Simulación — Interfaz Interactiva</p>
+  </header>
+
+  <!-- ── Configuration Card ──────────────────────────────────────── -->
+  <section class="card" id="config-card">
+    <div class="card-title"><span class="icon">⚙️</span> Configuración</div>
+
+    <div class="form-grid">
+      <!-- Method Selector (populated dynamically) -->
+      <div class="form-group">
+        <label for="method-select">Método</label>
+        <select id="method-select">
+          <option value="">Cargando métodos…</option>
+        </select>
+      </div>
+
+      <!-- f(x) -->
+      <div class="form-group full-width hidden" id="group-fx">
+        <label for="input-fx">f(x) <span class="field-hint">— expresión que se envía al método</span></label>
+        <input type="text" id="input-fx" placeholder="Usá la calculadora o escribí directamente" autocomplete="off" />
+      </div>
+
+      <!-- g(x) -->
+      <div class="form-group full-width hidden" id="group-gx">
+        <label for="input-gx">g(x) <span class="field-hint">— expresión que se envía al método</span></label>
+        <input type="text" id="input-gx" placeholder="Usá la calculadora o escribí directamente" autocomplete="off" />
+      </div>
+
+      <!-- Scientific Calculator -->
+      <div class="form-group full-width">
+        <label>Calculadora Científica <span class="calc-target-label" id="calc-target-label">→ f(x)</span></label>
+        <div class="sci-calc" id="sci-calc">
+
+          <!-- Math Display (rendered with KaTeX) -->
+          <div class="sci-calc-display" id="sci-calc-display">
+            <div class="sci-calc-math" id="sci-calc-math"></div>
+            <div class="sci-calc-code" id="sci-calc-code"></div>
+          </div>
+
+          <!-- Button Grid -->
+          <div class="sci-calc-grid">
+
+            <!-- Row 1: Constants, Variable, Actions -->
+            <button class="sci-btn const"  data-code="pi"      data-latex="\pi">π</button>
+            <button class="sci-btn const"  data-code="e"       data-latex="e">e</button>
+            <button class="sci-btn var"    data-code="x"       data-latex="x">x</button>
+            <button class="sci-btn op"     data-code=","       data-latex=",\,">,</button>
+            <button class="sci-btn action clear" data-action="clear">C</button>
+            <button class="sci-btn action" data-action="backspace">⌫</button>
+
+            <!-- Row 2: Trigonometry -->
+            <button class="sci-btn func" data-code="sin("  data-latex="\sin(">sin</button>
+            <button class="sci-btn func" data-code="cos("  data-latex="\cos(">cos</button>
+            <button class="sci-btn func" data-code="tan("  data-latex="\tan(">tan</button>
+            <button class="sci-btn func" data-code="asin(" data-latex="\sin^{-1}(">sin⁻¹</button>
+            <button class="sci-btn func" data-code="acos(" data-latex="\cos^{-1}(">cos⁻¹</button>
+            <button class="sci-btn func" data-code="atan(" data-latex="\tan^{-1}(">tan⁻¹</button>
+
+            <!-- Row 3: Functions -->
+            <button class="sci-btn func" data-code="sqrt("  data-latex="\sqrt{">√</button>
+            <button class="sci-btn func" data-code="nroot(" data-latex="\sqrt[]{" data-hint="ⁿ√ → ingresá ⁿ√(valor, n)">ⁿ√</button>
+            <button class="sci-btn func" data-code="exp("   data-latex="e^{">eˣ</button>
+            <button class="sci-btn func" data-code="log("   data-latex="\ln(">ln</button>
+            <button class="sci-btn func" data-code="log10(" data-latex="\log_{10}(">log₁₀</button>
+            <button class="sci-btn func" data-code="abs("   data-latex="|">|x|</button>
+
+            <!-- Row 4: Powers & Parens -->
+            <button class="sci-btn op" data-code="**2"    data-latex="^{2}">x²</button>
+            <button class="sci-btn op" data-code="**3"    data-latex="^{3}">x³</button>
+            <button class="sci-btn op" data-code="**"     data-latex="^{">xⁿ</button>
+            <button class="sci-btn op" data-code="**(1/"  data-latex="^{\\frac{1}{">x^(1/n)</button>
+            <button class="sci-btn paren" data-code="("   data-latex="(">(</button>
+            <button class="sci-btn paren" data-code=")"   data-latex=")">)</button>
+
+            <!-- Row 5: Numbers 7 8 9 + - × -->
+            <button class="sci-btn num" data-code="7" data-latex="7">7</button>
+            <button class="sci-btn num" data-code="8" data-latex="8">8</button>
+            <button class="sci-btn num" data-code="9" data-latex="9">9</button>
+            <button class="sci-btn op"  data-code=" + " data-latex="+">+</button>
+            <button class="sci-btn op"  data-code=" - " data-latex="-">−</button>
+            <button class="sci-btn op"  data-code=" * " data-latex=" \cdot ">×</button>
+
+            <!-- Row 6: Numbers 4 5 6 ÷ . 0 -->
+            <button class="sci-btn num" data-code="4" data-latex="4">4</button>
+            <button class="sci-btn num" data-code="5" data-latex="5">5</button>
+            <button class="sci-btn num" data-code="6" data-latex="6">6</button>
+            <button class="sci-btn op"  data-code=" / " data-latex="\div ">÷</button>
+            <button class="sci-btn num" data-code="."   data-latex=".">.</button>
+            <button class="sci-btn num" data-code="0"   data-latex="0">0</button>
+
+            <!-- Row 7: Numbers 1 2 3 + Insert -->
+            <button class="sci-btn num" data-code="1" data-latex="1">1</button>
+            <button class="sci-btn num" data-code="2" data-latex="2">2</button>
+            <button class="sci-btn num" data-code="3" data-latex="3">3</button>
+            <button class="sci-btn insert-btn" data-action="insert">↵ Insertar en campo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interval [a, b] -->
+      <div class="form-group hidden" id="group-a">
+        <label for="input-a">a (límite inferior)</label>
+        <input type="number" id="input-a" step="any" value="1" />
+      </div>
+      <div class="form-group hidden" id="group-b">
+        <label for="input-b">b (límite superior)</label>
+        <input type="number" id="input-b" step="any" value="2" />
+      </div>
+
+      <!-- x0 -->
+      <div class="form-group hidden" id="group-x0">
+        <label for="input-x0">x₀ (valor inicial)</label>
+        <input type="number" id="input-x0" step="any" value="1" />
+      </div>
+
+      <!-- Advanced params -->
+      <div class="form-group">
+        <label for="input-maxiter">Máx. iteraciones</label>
+        <input type="number" id="input-maxiter" value="100" min="1" />
+      </div>
+      <div class="form-group">
+        <label for="input-tol">Tolerancia</label>
+        <input type="text" id="input-tol" value="1e-6" />
+      </div>
+      <div class="form-group">
+        <label for="input-precision">Precisión (decimales)</label>
+        <input type="number" id="input-precision" value="8" min="1" max="15" />
+      </div>
+    </div>
+
+    <button class="btn-run" id="btn-run" type="button">
+      <span class="spinner" id="spinner"></span>
+      <span id="btn-text">▶ Ejecutar</span>
+    </button>
+
+    <div class="message-banner" id="message-banner"></div>
+  </section>
+
+  <!-- ── Results Card ────────────────────────────────────────────── -->
+  <section class="card hidden" id="results-card">
+    <div class="card-title"><span class="icon">📊</span> Resultados</div>
+    <div class="table-wrapper">
+      <table class="results-table" id="results-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Plot Card ───────────────────────────────────────────────── -->
+  <section class="card hidden" id="plot-card">
+    <div class="card-title"><span class="icon">📈</span> Gráfico de la función</div>
+    <div class="plot-container" id="plot-container"></div>
+  </section>
+
+</div>
+
+<script>
+// =====================================================================
+// DOM references
+// =====================================================================
+const methodSelect  = document.getElementById('method-select');
+const groupFx       = document.getElementById('group-fx');
+const groupGx       = document.getElementById('group-gx');
+const groupA        = document.getElementById('group-a');
+const groupB        = document.getElementById('group-b');
+const groupX0       = document.getElementById('group-x0');
+const inputFx       = document.getElementById('input-fx');
+const inputGx       = document.getElementById('input-gx');
+const inputA        = document.getElementById('input-a');
+const inputB        = document.getElementById('input-b');
+const inputX0       = document.getElementById('input-x0');
+const inputMaxIter  = document.getElementById('input-maxiter');
+const inputTol      = document.getElementById('input-tol');
+const inputPrec     = document.getElementById('input-precision');
+const btnRun        = document.getElementById('btn-run');
+const btnText       = document.getElementById('btn-text');
+const spinner       = document.getElementById('spinner');
+const messageBanner = document.getElementById('message-banner');
+const resultsCard   = document.getElementById('results-card');
+const plotCard       = document.getElementById('plot-card');
+const tableHead     = document.getElementById('table-head');
+const tableBody     = document.getElementById('table-body');
+const plotContainer  = document.getElementById('plot-container');
+
+let activeInput = inputFx;
+
+// =====================================================================
+// Dynamic method registry (loaded from API)
+// =====================================================================
+let methodsRegistry = {};
+
+async function loadMethods() {
+  try {
+    const res = await fetch('/api/methods');
+    methodsRegistry = await res.json();
+
+    const groups = {};
+    for (const [key, info] of Object.entries(methodsRegistry)) {
+      const clase = info.clase || 'General';
+      if (!groups[clase]) groups[clase] = [];
+      groups[clase].push({ key, nombre: info.nombre });
+    }
+
+    methodSelect.innerHTML = '';
+    let first = true;
+    for (const [clase, methods] of Object.entries(groups).sort()) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = clase;
+      for (const m of methods) {
+        const opt = document.createElement('option');
+        opt.value = m.key;
+        opt.textContent = m.nombre;
+        if (first) { opt.selected = true; first = false; }
+        optgroup.appendChild(opt);
+      }
+      methodSelect.appendChild(optgroup);
+    }
+    updateFields();
+  } catch (err) {
+    methodSelect.innerHTML = '<option value="">Error cargando métodos</option>';
+  }
+}
+
+// =====================================================================
+// Method → field visibility
+// =====================================================================
+function updateFields() {
+  const info = methodsRegistry[methodSelect.value];
+  if (!info) return;
+  const req = info.requiere || [];
+  groupFx.classList.toggle('hidden', !req.includes('f_expr'));
+  groupGx.classList.toggle('hidden', !req.includes('g_expr'));
+  groupA.classList.toggle('hidden',  !req.includes('a'));
+  groupB.classList.toggle('hidden',  !req.includes('b'));
+  groupX0.classList.toggle('hidden', !req.includes('x0'));
+  activeInput = req.includes('f_expr') ? inputFx : inputGx;
+  updateCalcTargetLabel();
+}
+
+methodSelect.addEventListener('change', updateFields);
+loadMethods();
+
+// =====================================================================
+// Scientific Calculator — Token-based with KaTeX rendering
+// =====================================================================
+const calcMathEl   = document.getElementById('sci-calc-math');
+const calcCodeEl   = document.getElementById('sci-calc-code');
+const calcTargetLabel = document.getElementById('calc-target-label');
+
+// Each token stores both the code (for backend) and latex (for display)
+let tokens = [];
+
+function updateCalcTargetLabel() {
+  const info = methodsRegistry[methodSelect.value];
+  if (!info) return;
+  const req = info.requiere || [];
+  if (req.includes('f_expr') && req.includes('g_expr')) {
+    calcTargetLabel.textContent = activeInput === inputFx ? '→ f(x)' : '→ g(x)';
+  } else if (req.includes('f_expr')) {
+    calcTargetLabel.textContent = '→ f(x)';
+  } else {
+    calcTargetLabel.textContent = '→ g(x)';
+  }
+}
+
+function getCodeString() {
+  return tokens.map(t => t.code).join('');
+}
+
+function getLatexString() {
+  return tokens.map(t => t.latex).join('');
+}
+
+function renderCalcDisplay() {
+  const rawLatex = getLatexString();
+  const code     = getCodeString();
+
+  if (rawLatex) {
+    // Auto-close open LaTeX braces so KaTeX can render incomplete expressions
+    let balanced = rawLatex;
+    let openBraces = 0;
+    for (const ch of balanced) {
+      if (ch === '{') openBraces++;
+      else if (ch === '}') openBraces = Math.max(0, openBraces - 1);
+    }
+    // Add a cursor placeholder and close braces
+    const cursorColor = '#22d3ee';
+    balanced += '\\textcolor{' + cursorColor + '}{|}'; // blinking cursor
+    for (let i = 0; i < openBraces; i++) balanced += '}';
+
+    try {
+      katex.render(balanced, calcMathEl, {
+        throwOnError: false,
+        displayMode: false,
+        errorColor: '#64748b',
+      });
+    } catch {
+      calcMathEl.textContent = rawLatex;
+    }
+  } else {
+    calcMathEl.innerHTML = '<span style="color:#64748b">Armá tu fórmula con los botones</span>';
+  }
+
+  // Show the code representation below
+  calcCodeEl.textContent = code || '';
+}
+
+// Initialize display
+renderCalcDisplay();
+
+// Handle calculator button clicks
+document.getElementById('sci-calc').addEventListener('click', (e) => {
+  const btn = e.target.closest('.sci-btn');
+  if (!btn) return;
+
+  const action = btn.dataset.action;
+
+  // Actions
+  if (action === 'clear') {
+    tokens = [];
+    renderCalcDisplay();
+    return;
+  }
+  if (action === 'backspace') {
+    tokens.pop();
+    renderCalcDisplay();
+    return;
+  }
+  if (action === 'insert') {
+    const code = getCodeString();
+    if (code) {
+      const input = activeInput;
+      const start = input.selectionStart;
+      const end   = input.selectionEnd;
+      const val   = input.value;
+      input.value = val.slice(0, start) + code + val.slice(end);
+      const newPos = start + code.length;
+      input.setSelectionRange(newPos, newPos);
+      input.focus();
+      tokens = [];
+      renderCalcDisplay();
+    }
+    return;
+  }
+
+  // Normal token insert
+  const code  = btn.dataset.code;
+  const latex = btn.dataset.latex;
+  if (code !== undefined && latex !== undefined) {
+    tokens.push({ code, latex });
+    renderCalcDisplay();
+  }
+});
+
+// Focus tracking
+inputFx.addEventListener('focus', () => { activeInput = inputFx; updateCalcTargetLabel(); });
+inputGx.addEventListener('focus', () => { activeInput = inputGx; updateCalcTargetLabel(); });
+
+// =====================================================================
+// Run
+// =====================================================================
+btnRun.addEventListener('click', async () => {
+  const method = methodSelect.value;
+  const body = {
+    method,
+    f_expr:    inputFx.value.trim(),
+    g_expr:    inputGx.value.trim(),
+    a:         inputA.value,
+    b:         inputB.value,
+    x0:        inputX0.value,
+    max_iter:  inputMaxIter.value,
+    tol:       inputTol.value,
+    precision: inputPrec.value,
+  };
+
+  btnRun.disabled = true;
+  btnText.textContent = 'Calculando…';
+  spinner.style.display = 'inline-block';
+  messageBanner.style.display = 'none';
+  messageBanner.className = 'message-banner';
+  resultsCard.classList.add('hidden');
+  plotCard.classList.add('hidden');
+
+  try {
+    const res  = await fetch('/api/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMessage(data.error || 'Error desconocido', 'error');
+      return;
+    }
+
+    showMessage(data.message, 'success');
+    renderTable(data.headers, data.iterations);
+    resultsCard.classList.remove('hidden');
+    renderPlot(data.plot, data.root, data.is_fx);
+    plotCard.classList.remove('hidden');
+
+  } catch (err) {
+    showMessage('Error de conexión: ' + err.message, 'error');
+  } finally {
+    btnRun.disabled = false;
+    btnText.textContent = '▶ Ejecutar';
+    spinner.style.display = 'none';
+  }
+});
+
+// =====================================================================
+// Helpers
+// =====================================================================
+function showMessage(msg, type) {
+  messageBanner.textContent = msg;
+  messageBanner.className = 'message-banner ' + type;
+}
+
+function renderTable(headers, rows) {
+  tableHead.innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+  tableBody.innerHTML = rows.map(row =>
+    '<tr>' + row.map(v => `<td>${v !== null && v !== undefined ? v : '—'}</td>`).join('') + '</tr>'
+  ).join('');
+}
+
+function renderPlot(plotData, root, isFx) {
+  const traces = [];
+  const label = isFx ? 'f(x)' : 'g(x)';
+
+  traces.push({
+    x: plotData.x, y: plotData.y,
+    mode: 'lines', name: label,
+    line: { color: '#22d3ee', width: 2.5 },
+  });
+
+  if (isFx) {
+    traces.push({
+      x: plotData.x, y: plotData.x.map(() => 0),
+      mode: 'lines', name: 'y = 0',
+      line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+    });
+  } else {
+    traces.push({
+      x: plotData.x, y: plotData.x,
+      mode: 'lines', name: 'y = x',
+      line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+    });
+  }
+
+  if (root) {
+    traces.push({
+      x: [root.x], y: [root.y],
+      mode: 'markers', name: isFx ? 'Raíz' : 'Punto fijo',
+      marker: { color: '#34d399', size: 12, symbol: 'diamond',
+                line: { color: '#fff', width: 2 } },
+    });
+  }
+
+  // Calculate dynamic initial viewport
+  const center = plotData.center || 0;
+  const xSpan = 5;
+  const initialX = [center - xSpan, center + xSpan];
+  
+  // Find min/max Y roughly within the initial X viewport
+  let yMin = Infinity, yMax = -Infinity;
+  for (let i = 0; i < plotData.x.length; i++) {
+    if (plotData.x[i] >= initialX[0] && plotData.x[i] <= initialX[1]) {
+      if (plotData.y[i] < yMin) yMin = plotData.y[i];
+      if (plotData.y[i] > yMax) yMax = plotData.y[i];
+    }
+  }
+  
+  // Fallback if no valid Y points found in range (e.g. sqrt(negative))
+  if (yMin === Infinity) { yMin = -10; yMax = 10; }
+  
+  const yPadding = Math.max(0.5, (yMax - yMin) * 0.15);
+  const initialY = [yMin - yPadding, yMax + yPadding];
+
+  const layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor:  'rgba(0,0,0,0)',
+    font: { family: 'Inter, sans-serif', color: '#94a3b8', size: 12 },
+    xaxis: { 
+      gridcolor: 'rgba(255,255,255,0.06)', 
+      zerolinecolor: 'rgba(255,255,255,0.12)', 
+      title: 'x',
+      range: initialX
+    },
+    yaxis: { 
+      gridcolor: 'rgba(255,255,255,0.06)', 
+      zerolinecolor: 'rgba(255,255,255,0.12)', 
+      title: label,
+      range: initialY
+    },
+    margin: { t: 20, r: 20, b: 50, l: 55 },
+    legend: { orientation: 'h', y: -0.2 },
+    showlegend: true,
+  };
+
+  Plotly.newPlot(plotContainer, traces, layout, {
+    responsive: true,
+    displayModeBar: true,
+    modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+  });
+}
+</script>
+
+</body>
+</html>

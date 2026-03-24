@@ -1,0 +1,509 @@
+/* ===================================================================
+   Modelado y Simulación — Numerical Methods Web Interface
+   Premium dark-mode design with glassmorphism
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Custom Properties ────────────────────────────────────────────── */
+:root {
+  --bg-primary:    #0b0e17;
+  --bg-secondary:  #111827;
+  --bg-card:       rgba(17, 24, 39, 0.65);
+  --bg-glass:      rgba(255, 255, 255, 0.04);
+  --border-glass:  rgba(255, 255, 255, 0.08);
+  --accent-cyan:   #22d3ee;
+  --accent-purple: #a78bfa;
+  --accent-pink:   #f472b6;
+  --accent-green:  #34d399;
+  --text-primary:  #f1f5f9;
+  --text-secondary:#94a3b8;
+  --text-muted:    #64748b;
+  --danger:        #f87171;
+  --shadow-glow:   0 0 40px rgba(34, 211, 238, 0.08);
+  --radius-sm:     8px;
+  --radius-md:     14px;
+  --radius-lg:     20px;
+  --transition:    0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Reset & Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Animated gradient blobs in the background */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+}
+body::before {
+  width: 600px; height: 600px;
+  top: -100px; left: -100px;
+  background: radial-gradient(circle, var(--accent-cyan), transparent);
+  animation: float 18s ease-in-out infinite alternate;
+}
+body::after {
+  width: 500px; height: 500px;
+  bottom: -100px; right: -100px;
+  background: radial-gradient(circle, var(--accent-purple), transparent);
+  animation: float 22s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes float {
+  0%   { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(60px, 40px) scale(1.15); }
+}
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+.app-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.app-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.app-header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.app-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-top: 0.4rem;
+}
+
+/* ── Glass Card ───────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-glow);
+  transition: border-color var(--transition);
+}
+.card:hover {
+  border-color: rgba(34, 211, 238, 0.15);
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.card-title .icon {
+  font-size: 1.2rem;
+}
+
+/* ── Form Grid ────────────────────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.form-group input,
+.form-group select {
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.85rem;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+.form-group select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+.form-group select optgroup,
+.form-group select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.form-group select optgroup {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.hidden { display: none !important; }
+
+/* ── Scientific Calculator ────────────────────────────────────────── */
+.calc-target-label {
+  color: var(--accent-cyan);
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.field-hint {
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+}
+
+.sci-calc {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  max-width: 520px;
+}
+
+/* Display — two-part: math render + code preview */
+.sci-calc-display {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem 0.5rem;
+  margin-bottom: 0.75rem;
+  min-height: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.sci-calc-math {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.2rem;
+  font-size: 1.3rem;
+  color: var(--text-primary);
+}
+
+.sci-calc-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 0.35rem;
+  white-space: nowrap;
+  min-height: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 0.35rem;
+}
+
+/* Button Grid */
+.sci-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.35rem;
+}
+
+.sci-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.3rem;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  user-select: none;
+  text-align: center;
+  white-space: nowrap;
+}
+.sci-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.sci-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+/* Number keys */
+.sci-btn.num {
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.sci-btn.num:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Function keys (trig, sqrt, log, etc.) */
+.sci-btn.func {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.15);
+  color: var(--accent-cyan);
+}
+.sci-btn.func:hover {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: var(--accent-cyan);
+}
+
+/* Operator keys */
+.sci-btn.op {
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.15);
+  color: var(--accent-purple);
+}
+.sci-btn.op:hover {
+  background: rgba(167, 139, 250, 0.18);
+  border-color: var(--accent-purple);
+}
+
+/* Constant keys (pi, e) */
+.sci-btn.const {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+.sci-btn.const:hover {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: #fbbf24;
+}
+
+/* Variable x */
+.sci-btn.var {
+  background: rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.15);
+  color: var(--accent-green);
+  font-weight: 600;
+}
+.sci-btn.var:hover {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: var(--accent-green);
+}
+
+/* Parentheses */
+.sci-btn.paren {
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.sci-btn.paren:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Action keys (C, backspace) */
+.sci-btn.action {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+  font-weight: 600;
+}
+.sci-btn.action:hover {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: var(--danger);
+}
+.sci-btn.action.clear {
+  font-size: 1rem;
+}
+
+/* Insert button (spans 3 columns) */
+.sci-btn.insert-btn {
+  grid-column: span 3;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  border: none;
+  color: #0b0e17;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.65rem;
+}
+.sci-btn.insert-btn:hover {
+  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.3);
+}
+
+/* ── Run Button ───────────────────────────────────────────────────── */
+.btn-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #0b0e17;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 20px rgba(34, 211, 238, 0.25);
+}
+.btn-run:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(34, 211, 238, 0.35);
+}
+.btn-run:active {
+  transform: translateY(0);
+}
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Spinner ──────────────────────────────────────────────────────── */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid transparent;
+  border-top-color: #0b0e17;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Message Banner ───────────────────────────────────────────────── */
+.message-banner {
+  margin-top: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: none;
+}
+.message-banner.success {
+  display: block;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  color: var(--accent-green);
+}
+.message-banner.error {
+  display: block;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  color: var(--danger);
+}
+
+/* ── Results Table ────────────────────────────────────────────────── */
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+}
+
+.results-table thead th {
+  background: rgba(34, 211, 238, 0.07);
+  color: var(--accent-cyan);
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-glass);
+  position: sticky;
+  top: 0;
+}
+
+.results-table tbody tr {
+  transition: background var(--transition);
+}
+.results-table tbody tr:hover {
+  background: rgba(34, 211, 238, 0.04);
+}
+
+.results-table tbody td {
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border-glass);
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.results-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.results-table tbody tr:last-child td {
+  color: var(--accent-green);
+  font-weight: 500;
+}
+
+/* ── Plot Container ───────────────────────────────────────────────── */
+.plot-container {
+  margin-top: 1rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  min-height: 350px;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .app-container { padding: 1rem; }
+  .card { padding: 1.25rem; }
+  .app-header h1 { font-size: 1.6rem; }
+  .form-grid { grid-template-columns: 1fr; }
+}
