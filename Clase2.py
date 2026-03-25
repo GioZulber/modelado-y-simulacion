@@ -50,10 +50,10 @@ funcionAitken4 = lambda x: np.log(x + 1)
 x04 = 0.5
 
 
-aitken(funcionAitken1, x0)
-    #aitken(funcionAitken2, x02)
-    #aitken(funcionAitken3, x03)
-    #aitken(funcionAitken4, x04)
+#aitken(funcionAitken1, x0)
+#aitken(funcionAitken2, x02)
+#aitken(funcionAitken3, x03)
+#aitken(funcionAitken4, x04)
 
 
 
@@ -115,4 +115,4 @@ funcion3 = lambda x: x**3 - 2*x -5
 #newton_raphson(funcion3, 1.5)
 
 funcion4 = lambda x: x * np.exp(-x)
-#newton_raphson(funcion4, -1)
+newton_raphson(funcion4, -1)

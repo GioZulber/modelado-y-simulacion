@@ -1,65 +1,96 @@
 # Modelado y Simulación - Métodos Numéricos
 
-Aplicación web interactiva para la resolución y visualización de métodos numéricos utilizando **Python**, **Flask** y **NumPy**.
+Aplicación web interactiva para la resolución y visualización de métodos numéricos. 
+Reconstruida con una arquitectura moderna para garantizar un entorno escalable, eficiente y fácil de mantener.
 
-## 🚀 Cómo Funciona
+## 🚀 Arquitectura del Proyecto
 
-El proyecto es una aplicación web (backend en Flask, frontend en HTML/CSS/JS) que permite a los usuarios:
+El proyecto está dividido en dos partes principales:
 
-1. **Seleccionar métodos numéricos**: La arquitectura es escalable. Los métodos se auto-descubren leyendo cualquier archivo que empiece con `clase` dentro del directorio `metodos/`. Cada archivo expone un diccionario `METODOS` que se registra automáticamente en la aplicación.
-2. **Ingresar funciones matemáticas**: Puedes ingresar funciones $f(x)$ o expresiones para $g(x)$. El backend evalúa estas expresiones de forma segura utilizando NumPy.
-3. **Calcular y Visualizar**: Al hacer clic en "Resolver", la aplicación ejecuta el método seleccionado considerando la tolerancia y criterios de parada, retornando las iteraciones y los datos necesarios para graficar la función y resaltar la raíz encontrada.
-
-### Estructura Principal
-
-- `app.py`: Archivo principal que levanta el servidor Flask, expone la API de resolución matemática y sirve el HTML.
-- `metodos/`: Directorio que contiene los algoritmos de los diferentes métodos numéricos (por ejemplo `clase1.py`, `clase2.py`). 
-- `templates/` y `static/`: Archivos para la interfaz de usuario.
-- `requirements.txt`: Dependencias del entorno en Python.
+1. **Backend (Python + FastAPI):**
+   * Se encarga de toda la lógica matemática pesada.
+   * Utiliza **NumPy** para cálculos numéricos eficientes y **SymPy** para el análisis simbólico de funciones (parseo seguro, cálculo de derivadas automáticas, etc.).
+   * Arquitectura "Plug & Play" en la carpeta `backend/metodos/`. Cada vez que agregues un nuevo método, la API lo detectará y el frontend se actualizará automáticamente sin tener que tocar código de UI.
+2. **Frontend (React + Vite + TypeScript):**
+   * Interfaz gráfica dinámica y rápida.
+   * Dibuja los formularios (entradas de datos como $a$, $b$, $x_0$, $f(x)$) dinámicamente según lo que requiera cada método.
+   * Gráficos interactivos generados con **Plotly.js** y renderizado de fórmulas matemáticas con **KaTeX**.
 
 ---
 
-## 💻 Instalación y Ejecución Local
+## 💻 Instalación y Ejecución Rápida
 
-Sigue los siguientes pasos para correr el proyecto en tu máquina local:
+La forma más sencilla de ejecutar ambos servidores simultáneamente (y con recarga automática de cambios) es utilizando el script maestro:
 
-### 1. Requisitos previos
-- Necesitas tener **Python 3.x** instalado en tu computadora.
+### Prerrequisitos
+* **Python 3.10+**
+* **Node.js** y **npm** (para el frontend en React)
 
-### 2. Clonar el repositorio
-Abre una terminal en la carpeta donde deseas guardar el proyecto y clona el repositorio (o simplemente abre la carpeta del proyecto en tu terminal si ya lo tienes).
+### Comando Mágico (macOS / Linux)
+Abre la terminal en la raíz del proyecto y ejecuta:
 
-### 3. Crear y activar un Entorno Virtual (Recomendado)
-Es buena práctica instalar las dependencias dentro de un entorno virtual para no afectar otras instalaciones locales de Python.
-
-**En macOS y Linux:**
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+chmod +x run.sh
+./run.sh
 ```
 
-**En OS Windows:**
-```cmd
+**¿Qué hace este script?**
+1. Crea un entorno virtual (`.venv`) en la carpeta del backend si no existe.
+2. Instala las dependencias de Python (`fastapi`, `numpy`, `sympy`, etc.).
+3. Instala los paquetes de React en la carpeta `frontend/`.
+4. Levanta FastAPI en el **puerto 8000** en segundo plano (con File Watcher optimizado para no consumir CPU extra).
+5. Levanta el frontend de Vite en el **puerto 5173**.
+
+👉 Abre tu navegador web en: **[http://localhost:5173](http://localhost:5173)**
+
+Para apagar ambos servidores, simplemente presiona `Ctrl + C` en la misma terminal.
+
+---
+
+## 👨‍🏫 Flujo de Trabajo (Para la clase de los jueves)
+
+El sistema está diseñado para que agregar nuevos métodos sea extremadamente fácil. 
+No necesitas tocar *absolutamente nada* de HTML, CSS o React.
+
+### Cómo agregar un nuevo método:
+
+1. Ve a la carpeta `backend/metodos/` y abre (o crea) tu archivo, por ejemplo `clase3.py`.
+2. Programa la matemática de tu método (asegúrate de devolver las `iteraciones` y un mensaje final).
+3. Añádelo al diccionario `METODOS` al final del archivo. Especifica qué inputs necesita en la lista `requiere`:
+
+```python
+METODOS = {
+    "nuevo_metodo": {
+        "nombre": "Mi Nuevo Método",
+        "clase": "Clase 3",
+        "requiere": ["f_expr", "x0", "x1"], # ¡El Frontend dibujará automáticamente estas cajitas!
+        "headers": ["Iter", "x0", "x1", "Error"],
+        "resolver": mi_funcion_nativa_de_python,
+        "root_col": 2, # La columna del arreglo que contiene la raíz para graficarla
+    }
+}
+```
+
+4. **¡Listo!** Guarda el archivo. El backend se recargará automáticamente y al refrescar el navegador, el método ya estará disponible con su interfaz gráfica perfecta.
+
+---
+
+## 🛠 Ejecución Manual (Opcional)
+
+Si prefieres levantar los servicios por separado en distintas pestañas de la terminal:
+
+**1. Backend:**
+```bash
+cd backend
 python -m venv .venv
-.venv\Scripts\activate
-```
-
-### 4. Instalar las dependencias
-Con el entorno virtual activado, instala los requerimientos definidos en `requirements.txt`:
-```bash
+source .venv/bin/activate
 pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir .
 ```
 
-### 5. Iniciar la aplicación
-Ejecuta el archivo principal para iniciar el servidor de desarrollo:
+**2. Frontend:**
 ```bash
-python app.py
+cd frontend
+npm install
+npm run dev
 ```
-O dale play desde Visual.
-
-### 6. Usar la aplicación
-Abre tu navegador web de preferencia y navega a la siguiente dirección: 
-👉 **[http://localhost:5000](http://localhost:5000)**
-👉 **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
-
-Para detener la ejecución del servidor local, simplemente presiona `Ctrl + C` en tu terminal.

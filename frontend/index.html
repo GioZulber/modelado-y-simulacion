@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Métodos Numéricos — Modelado y Simulación</title>
+    <meta name="description" content="Interfaz web para ejecutar métodos numéricos con calculadora científica visual y gráficos interactivos." />
+    <!-- Fix for Plotly.js in Vite -->
+    <script>window.global = window;</script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- KaTeX CSS for rendering math in the calculator -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
