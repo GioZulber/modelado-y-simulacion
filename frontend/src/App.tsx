@@ -22,7 +22,7 @@ function App() {
     precision: '8'
   });
 
-  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr'>('f_expr');
+  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr' | 'x_data' | 'y_data'>('f_expr');
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -30,6 +30,8 @@ function App() {
 
   const inputFxRef = useRef<HTMLInputElement>(null);
   const inputGxRef = useRef<HTMLInputElement>(null);
+  const inputXdataRef = useRef<HTMLInputElement>(null);
+  const inputYdataRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get('/api/methods')
@@ -68,7 +70,14 @@ function App() {
   };
 
   const handleInsertCode = (code: string) => {
-    const inputRef = activeInput === 'f_expr' ? inputFxRef.current : inputGxRef.current;
+    const refs: Record<string, React.RefObject<HTMLInputElement | null>> = {
+      f_expr: inputFxRef,
+      g_expr: inputGxRef,
+      x_data: inputXdataRef,
+      y_data: inputYdataRef
+    };
+    
+    const inputRef = refs[activeInput]?.current;
     if (inputRef) {
       const start = inputRef.selectionStart || 0;
       const end = inputRef.selectionEnd || 0;
@@ -115,6 +124,9 @@ function App() {
   };
 
   const getTargetLabel = () => {
+    if (activeInput === 'x_data') return 'x_data';
+    if (activeInput === 'y_data') return 'y_data';
+    
     if (requires.includes('f_expr') && requires.includes('g_expr')) {
       return activeInput === 'f_expr' ? 'f(x)' : 'g(x)';
     } else if (requires.includes('f_expr')) {
@@ -198,9 +210,12 @@ function App() {
               type="text" 
               name="x_data"
               id="input-xdata" 
-              placeholder="ej. 0, 1, 2" 
+              ref={inputXdataRef}
+              placeholder="ej. 0, pi/2, pi" 
+              autoComplete="off"
               value={inputs.x_data}
               onChange={handleInputChange}
+              onFocus={() => setActiveInput('x_data')}
             />
           </div>
 
@@ -210,9 +225,12 @@ function App() {
               type="text" 
               name="y_data"
               id="input-ydata" 
-              placeholder="ej. 1, 3, 0" 
+              ref={inputYdataRef}
+              placeholder="ej. 1, sin(pi/2), 0" 
+              autoComplete="off"
               value={inputs.y_data}
               onChange={handleInputChange}
+              onFocus={() => setActiveInput('y_data')}
             />
           </div>
 

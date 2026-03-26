@@ -34,6 +34,16 @@ class SolveRequest(BaseModel):
     tol: float = 1e-6
     precision: int = 8
 
+def eval_math_expr(expr_str: str) -> float:
+    """Safely evaluates a single math expression to a float."""
+    import re
+    expr_str = re.sub(r'\be\b', 'E', expr_str)
+    try:
+        val = sp.sympify(expr_str).evalf()
+        return float(val)
+    except Exception as e:
+        raise ValueError(f"Could not evaluate '{expr_str}': {str(e)}")
+
 # ---------------------------------------------------------------------------
 # Safe math expression evaluator using SymPy
 # ---------------------------------------------------------------------------
@@ -131,9 +141,9 @@ def solve(req: SolveRequest):
         kwargs = {"max_iter": req.max_iter, "tol": req.tol, "precision": req.precision}
 
         if "x_data" in requiere:
-            kwargs["x_data"] = [float(x.strip()) for x in req.x_data.split(",") if x.strip()]
+            kwargs["x_data"] = [eval_math_expr(x.strip()) for x in req.x_data.split(",") if x.strip()]
         if "y_data" in requiere:
-            kwargs["y_data"] = [float(y.strip()) for y in req.y_data.split(",") if y.strip()]
+            kwargs["y_data"] = [eval_math_expr(y.strip()) for y in req.y_data.split(",") if y.strip()]
 
         plot_fn = None
         fn = None
