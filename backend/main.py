@@ -25,6 +25,8 @@ class SolveRequest(BaseModel):
     method: str
     f_expr: Optional[str] = ""
     g_expr: Optional[str] = ""
+    x_data: Optional[str] = ""
+    y_data: Optional[str] = ""
     a: Optional[float] = None
     b: Optional[float] = None
     x0: Optional[float] = None
@@ -128,6 +130,11 @@ def solve(req: SolveRequest):
     try:
         kwargs = {"max_iter": req.max_iter, "tol": req.tol, "precision": req.precision}
 
+        if "x_data" in requiere:
+            kwargs["x_data"] = [float(x.strip()) for x in req.x_data.split(",") if x.strip()]
+        if "y_data" in requiere:
+            kwargs["y_data"] = [float(y.strip()) for y in req.y_data.split(",") if y.strip()]
+
         plot_fn = None
         fn = None
         f_fn = None
@@ -146,21 +153,41 @@ def solve(req: SolveRequest):
         if "a" in requiere and "b" in requiere:
             if req.a is None or req.b is None:
                 raise ValueError("Parameters 'a' and 'b' are required")
-            iterations, message = resolver(fn, float(req.a), float(req.b), **kwargs)
+            res = resolver(fn, float(req.a), float(req.b), **kwargs)
             plot_center = (req.a + req.b) / 2
-        elif "x0" in requiere:
+        elif "x0" in requiere and "x_data" not in requiere:
             if req.x0 is None:
                 raise ValueError("Parameter 'x0' is required")
-            iterations, message = resolver(fn, float(req.x0), **kwargs)
+            res = resolver(fn, float(req.x0), **kwargs)
             plot_center = req.x0
         else:
-            iterations, message = resolver(fn, **kwargs)
-            plot_center = 0
+            if "x0" in requiere and req.x0 is not None:
+                kwargs["x0"] = float(req.x0)
+            res = resolver(fn, **kwargs)
+            if "x_data" in kwargs and kwargs["x_data"]:
+                plot_center = sum(kwargs["x_data"]) / len(kwargs["x_data"])
+            else:
+                plot_center = 0
 
-        x_plot, y_plot = generate_plot_data(plot_fn, center=plot_center)
+        plot_secondary = None
+        if isinstance(res, tuple) and len(res) == 3:
+            iterations, message, poly_expr = res
+            poly_fn = parse_function(poly_expr)
+            x_plot2, y_plot2 = generate_plot_data(poly_fn, center=plot_center)
+            plot_secondary = {"x": x_plot2, "y": y_plot2, "label": "P(x)"}
+        else:
+            iterations, message = res
+
+        nodes = None
+        if "x_data" in kwargs and "y_data" in kwargs:
+            nodes = [{"x": x, "y": y} for x, y in zip(kwargs["x_data"], kwargs["y_data"])]
+
+        x_plot, y_plot = [], []
+        if plot_fn is not None:
+            x_plot, y_plot = generate_plot_data(plot_fn, center=plot_center)
 
         root = None
-        if iterations:
+        if iterations and root_col and root_col in iterations[-1]:
             root = iterations[-1][root_col]
 
         root_y = None
@@ -178,7 +205,9 @@ def solve(req: SolveRequest):
             "headers": info["headers"],
             "iterations": iterations,
             "message": message,
-            "plot": {"x": x_plot, "y": y_plot, "center": plot_center},
+            "plot": {"x": x_plot, "y": y_plot, "center": plot_center} if plot_fn else None,
+            "plot_secondary": plot_secondary,
+            "nodes": nodes,
             "root": {"x": root, "y": root_y} if root is not None else None,
             "is_fx": is_fx,
         }

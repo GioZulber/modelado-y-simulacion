@@ -19,12 +19,14 @@ interface RootData {
 }
 
 interface GraficoProps {
-  plotData: PlotData;
+  plotData: PlotData | null;
+  plotSecondaryData?: PlotData | null;
+  nodesData?: RootData[] | null;
   rootData: RootData | null;
   isFx: boolean;
 }
 
-export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, rootData, isFx }) => {
+export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecondaryData, nodesData, rootData, isFx }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,33 +35,45 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, rootData, 
     const traces: any[] = [];
     const label = isFx ? 'f(x)' : 'g(x)';
 
-    traces.push({
-      x: plotData.x, 
-      y: plotData.y,
-      mode: 'lines', 
-      name: label,
-      line: { color: '#22d3ee', width: 2.5 },
-    });
-
-    if (isFx) {
+    if (plotData) {
       traces.push({
         x: plotData.x, 
-        y: plotData.x.map(() => 0),
+        y: plotData.y,
         mode: 'lines', 
-        name: 'y = 0',
-        line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+        name: label,
+        line: { color: '#22d3ee', width: 2.5 },
       });
-    } else {
+
+      if (isFx) {
+        traces.push({
+          x: plotData.x, 
+          y: plotData.x.map(() => 0),
+          mode: 'lines', 
+          name: 'y = 0',
+          line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+        });
+      } else {
+        traces.push({
+          x: plotData.x, 
+          y: plotData.x,
+          mode: 'lines', 
+          name: 'y = x',
+          line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+        });
+      }
+    }
+
+    if (plotSecondaryData) {
       traces.push({
-        x: plotData.x, 
-        y: plotData.x,
+        x: plotSecondaryData.x, 
+        y: plotSecondaryData.y,
         mode: 'lines', 
-        name: 'y = x',
-        line: { color: 'rgba(255,255,255,0.15)', width: 1, dash: 'dot' },
+        name: 'P(x) (Polinomio)',
+        line: { color: '#f97316', width: 2.5, dash: plotData ? 'dash' : 'solid' },
       });
     }
 
-    if (rootData) {
+    if (rootData && rootData.x !== undefined) {
       traces.push({
         x: [rootData.x], 
         y: [rootData.y],
@@ -69,15 +83,28 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, rootData, 
       });
     }
 
-    const center = plotData.center || 0;
+    if (nodesData && nodesData.length > 0) {
+      traces.push({
+        x: nodesData.map(n => n.x), 
+        y: nodesData.map(n => n.y),
+        mode: 'markers', 
+        name: 'Nodos',
+        marker: { color: '#f43f5e', size: 10, symbol: 'circle', line: { color: '#fff', width: 1.5 } },
+      });
+    }
+
+    const mainPlot = plotSecondaryData || plotData;
+    if (!mainPlot || !mainPlot.x) return;
+
+    const center = mainPlot.center || 0;
     const xSpan = 5;
     const initialX = [center - xSpan, center + xSpan];
     
     let yMin = Infinity, yMax = -Infinity;
-    for (let i = 0; i < plotData.x.length; i++) {
-      if (plotData.x[i] >= initialX[0] && plotData.x[i] <= initialX[1]) {
-        if (plotData.y[i] < yMin) yMin = plotData.y[i];
-        if (plotData.y[i] > yMax) yMax = plotData.y[i];
+    for (let i = 0; i < mainPlot.x.length; i++) {
+      if (mainPlot.x[i] >= initialX[0] && mainPlot.x[i] <= initialX[1]) {
+        if (mainPlot.y[i] < yMin) yMin = mainPlot.y[i];
+        if (mainPlot.y[i] > yMax) yMax = mainPlot.y[i];
       }
     }
     
@@ -114,7 +141,7 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, rootData, 
       modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     });
 
-  }, [plotData, rootData, isFx]);
+  }, [plotData, plotSecondaryData, nodesData, rootData, isFx]);
 
   return <div ref={containerRef} className="plot-container" />;
 };

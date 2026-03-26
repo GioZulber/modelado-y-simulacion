@@ -12,6 +12,8 @@ function App() {
   const [inputs, setInputs] = useState({
     f_expr: '',
     g_expr: '',
+    x_data: '0, 1, 2',
+    y_data: '1, 3, 0',
     a: '1',
     b: '2',
     x0: '1',
@@ -190,6 +192,30 @@ function App() {
             targetLabel={getTargetLabel()} 
           />
 
+          <div className={`form-group full-width ${!requires.includes('x_data') ? 'hidden' : ''}`}>
+            <label htmlFor="input-xdata">x_data <span className="field-hint">— puntos separados por comas</span></label>
+            <input 
+              type="text" 
+              name="x_data"
+              id="input-xdata" 
+              placeholder="ej. 0, 1, 2" 
+              value={inputs.x_data}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div className={`form-group full-width ${!requires.includes('y_data') ? 'hidden' : ''}`}>
+            <label htmlFor="input-ydata">y_data <span className="field-hint">— valores separados por comas</span></label>
+            <input 
+              type="text" 
+              name="y_data"
+              id="input-ydata" 
+              placeholder="ej. 1, 3, 0" 
+              value={inputs.y_data}
+              onChange={handleInputChange}
+            />
+          </div>
+
           <div className={`form-group ${!requires.includes('a') ? 'hidden' : ''}`}>
             <label htmlFor="input-a">a (límite inferior)</label>
             <input type="number" name="a" id="input-a" step="any" value={inputs.a} onChange={handleInputChange} />
@@ -238,14 +264,18 @@ function App() {
             <TablaIteraciones headers={results.headers} iterations={results.iterations} />
           </section>
 
-          <section className="card">
-            <div className="card-title"><span className="icon">📈</span> Gráfico de la función</div>
-            <GraficoResultados 
-              plotData={results.plot} 
-              rootData={results.root} 
-              isFx={results.is_fx} 
-            />
-          </section>
+          {(results.plot || results.plot_secondary) && (
+            <section className="card">
+              <div className="card-title"><span className="icon">📈</span> Gráfico de la función</div>
+              <GraficoResultados 
+                plotData={results.plot}
+                plotSecondaryData={results.plot_secondary}
+                nodesData={results.nodes}
+                rootData={results.root} 
+                isFx={results.is_fx} 
+              />
+            </section>
+          )}
         </>
       )}
     </div>
