@@ -13,6 +13,7 @@ interface Token {
 
 export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, targetLabel }) => {
   const [tokens, setTokens] = useState<Token[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
   const mathRef = useRef<HTMLDivElement>(null);
 
   const getCodeString = () => tokens.map(t => t.code).join('');
@@ -21,7 +22,7 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
   useEffect(() => {
     const rawLatex = getLatexString();
     
-    if (mathRef.current) {
+    if (mathRef.current && isOpen) {
       if (rawLatex) {
         let balanced = rawLatex;
         let openBraces = 0;
@@ -30,7 +31,7 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
           else if (ch === '}') openBraces = Math.max(0, openBraces - 1);
         }
         
-        const cursorColor = '#22d3ee';
+        const cursorColor = '#06b6d4';
         balanced += '\\textcolor{' + cursorColor + '}{|}'; 
         for (let i = 0; i < openBraces; i++) balanced += '}';
 
@@ -38,16 +39,16 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
           katex.render(balanced, mathRef.current, {
             throwOnError: false,
             displayMode: false,
-            errorColor: '#64748b',
+            errorColor: '#475569',
           });
         } catch {
           mathRef.current.textContent = rawLatex;
         }
       } else {
-        mathRef.current.innerHTML = '<span style="color:#64748b">Armá tu fórmula con los botones</span>';
+        mathRef.current.innerHTML = '<span style="color:#475569">Armá tu fórmula con los botones</span>';
       }
     }
-  }, [tokens]);
+  }, [tokens, isOpen]);
 
   const handleAction = (action: string) => {
     if (action === 'clear') setTokens([]);
@@ -55,6 +56,7 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
     else if (action === 'insert') {
       onInsert(getCodeString());
       setTokens([]);
+      setIsOpen(false);
     }
   };
 
@@ -63,63 +65,114 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
   };
 
   return (
-    <div className="form-group full-width">
-      <label>Calculadora Científica <span className="calc-target-label">→ {targetLabel}</span></label>
-      <div className="sci-calc">
-        <div className="sci-calc-display">
-          <div className="sci-calc-math" ref={mathRef}></div>
-          <div className="sci-calc-code">{getCodeString() || ''}</div>
+    <div className="form-group full-width" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+      {!isOpen ? (
+        <button 
+          type="button" 
+          onClick={() => setIsOpen(true)}
+          style={{
+            width: '100%',
+            padding: '0.6rem',
+            background: 'var(--bg-secondary)',
+            border: '1px dashed var(--border-card)',
+            color: 'var(--text-secondary)',
+            borderRadius: 'var(--radius-sm)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'var(--transition)'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.borderColor = 'var(--accent-cyan)';
+            e.currentTarget.style.color = 'var(--accent-cyan)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-card)';
+            e.currentTarget.style.color = 'var(--text-secondary)';
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>⌨️</span> Mostrar Teclado Matemático
+        </button>
+      ) : (
+        <div className="sci-calc">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <label style={{ margin: 0 }}>Teclado Matemático <span className="calc-target-label">→ {targetLabel}</span></label>
+            <button 
+              type="button" 
+              onClick={() => setIsOpen(false)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                fontSize: '0.8rem', textTransform: 'uppercase', fontFamily: 'var(--font-ui)'
+              }}
+            >
+              Ocultar ✕
+            </button>
+          </div>
+          
+          <div className="sci-calc-display">
+            <div className="sci-calc-math" ref={mathRef}></div>
+            <div className="sci-calc-code">{getCodeString() || ''}</div>
+          </div>
+
+          <div className="sci-calc-grid">
+            {/* Fila 1 */}
+            <button type="button" className="sci-btn const" onClick={() => handleToken('pi', '\\pi')}>π</button>
+            <button type="button" className="sci-btn const" onClick={() => handleToken('e', 'e')}>e</button>
+            <button type="button" className="sci-btn var" onClick={() => handleToken('x', 'x')}>x</button>
+            <button type="button" className="sci-btn paren" onClick={() => handleToken('(', '(')}>(</button>
+            <button type="button" className="sci-btn paren" onClick={() => handleToken(')', ')')}>)</button>
+            <button type="button" className="sci-btn action clear" onClick={() => handleAction('clear')}>C</button>
+
+            {/* Fila 2 */}
+            <button type="button" className="sci-btn func" onClick={() => handleToken('sin(', '\\sin(')}>sin</button>
+            <button type="button" className="sci-btn func" onClick={() => handleToken('cos(', '\\cos(')}>cos</button>
+            <button type="button" className="sci-btn func" onClick={() => handleToken('tan(', '\\tan(')}>tan</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('7', '7')}>7</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('8', '8')}>8</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('9', '9')}>9</button>
+
+            {/* Fila 3 */}
+            <button type="button" className="sci-btn func" onClick={() => handleToken('asin(', '\\sin^{-1}(')}>sin⁻¹</button>
+            <button type="button" className="sci-btn func" onClick={() => handleToken('acos(', '\\cos^{-1}(')}>cos⁻¹</button>
+            <button type="button" className="sci-btn func" onClick={() => handleToken('atan(', '\\tan^{-1}(')}>tan⁻¹</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('4', '4')}>4</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('5', '5')}>5</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('6', '6')}>6</button>
+            
+            {/* Fila 4 */}
+            <button type="button" className="sci-btn func" onClick={() => handleToken('exp(', 'e^{')}>eˣ</button>
+            <button type="button" className="sci-btn func" onClick={() => handleToken('log(', '\\ln(')}>ln</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken('**', '^{')}>xⁿ</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('1', '1')}>1</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('2', '2')}>2</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('3', '3')}>3</button>
+
+            {/* Fila 5 */}
+            <button type="button" className="sci-btn func" onClick={() => handleToken('sqrt(', '\\sqrt{')}>√</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken('**2', '^{2}')}>x²</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken(',', ',\\,')}>,</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('0', '0')}>0</button>
+            <button type="button" className="sci-btn num" onClick={() => handleToken('.', '.')}>.</button>
+            <button type="button" className="sci-btn action" onClick={() => handleToken('', '}')} style={{color: 'var(--text-primary)', border: '1px solid var(--accent-cyan)'}}>→</button>
+            
+            {/* Fila 6 */}
+            <button type="button" className="sci-btn op" onClick={() => handleToken(' + ', '+')}>+</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken(' - ', '-')}>−</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken(' * ', ' \\cdot ')}>×</button>
+            <button type="button" className="sci-btn op" onClick={() => handleToken(' / ', '\\div ')}>÷</button>
+            <button type="button" className="sci-btn action" onClick={() => handleAction('backspace')}>⌫</button>
+            <button type="button" className="sci-btn insert-btn" style={{ gridColumn: 'span 1', padding: '0.4rem' }} onClick={() => handleAction('insert')}>↵</button>
+          </div>
+          
+          <button type="button" className="sci-btn insert-btn" style={{ width: '100%', marginTop: '0.5rem', gridColumn: 'auto' }} onClick={() => handleAction('insert')}>
+            ↵ Insertar fórmula en el campo
+          </button>
         </div>
-
-        <div className="sci-calc-grid">
-          <button type="button" className="sci-btn const" onClick={() => handleToken('pi', '\\pi')}>π</button>
-          <button type="button" className="sci-btn const" onClick={() => handleToken('e', 'e')}>e</button>
-          <button type="button" className="sci-btn var" onClick={() => handleToken('x', 'x')}>x</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken(',', ',\\,')}>,</button>
-          <button type="button" className="sci-btn action clear" onClick={() => handleAction('clear')}>C</button>
-          <button type="button" className="sci-btn action" onClick={() => handleAction('backspace')}>⌫</button>
-
-          <button type="button" className="sci-btn func" onClick={() => handleToken('sin(', '\\sin(')}>sin</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('cos(', '\\cos(')}>cos</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('tan(', '\\tan(')}>tan</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('asin(', '\\sin^{-1}(')}>sin⁻¹</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('acos(', '\\cos^{-1}(')}>cos⁻¹</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('atan(', '\\tan^{-1}(')}>tan⁻¹</button>
-
-          <button type="button" className="sci-btn func" onClick={() => handleToken('sqrt(', '\\sqrt{')}>√</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('nroot(', '\\sqrt[]{')}>ⁿ√</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('exp(', 'e^{')}>eˣ</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('log(', '\\ln(')}>ln</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('log10(', '\\log_{10}(')}>log₁₀</button>
-          <button type="button" className="sci-btn func" onClick={() => handleToken('abs(', '|')}>|x|</button>
-
-          <button type="button" className="sci-btn op" onClick={() => handleToken('**2', '^{2}')}>x²</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken('**3', '^{3}')}>x³</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken('**', '^{')}>xⁿ</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken('**(1/', '^{\\frac{1}{')}>x^(1/n)</button>
-          <button type="button" className="sci-btn paren" onClick={() => handleToken('(', '(')}>(</button>
-          <button type="button" className="sci-btn paren" onClick={() => handleToken(')', ')')}>)</button>
-
-          <button type="button" className="sci-btn num" onClick={() => handleToken('7', '7')}>7</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('8', '8')}>8</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('9', '9')}>9</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken(' + ', '+')}>+</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken(' - ', '-')}>−</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken(' * ', ' \\cdot ')}>×</button>
-
-          <button type="button" className="sci-btn num" onClick={() => handleToken('4', '4')}>4</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('5', '5')}>5</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('6', '6')}>6</button>
-          <button type="button" className="sci-btn op" onClick={() => handleToken(' / ', '\\div ')}>÷</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('.', '.')}>.</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('0', '0')}>0</button>
-
-          <button type="button" className="sci-btn num" onClick={() => handleToken('1', '1')}>1</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('2', '2')}>2</button>
-          <button type="button" className="sci-btn num" onClick={() => handleToken('3', '3')}>3</button>
-          <button type="button" className="sci-btn insert-btn" onClick={() => handleAction('insert')}>↵ Insertar en campo</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
