@@ -12,6 +12,7 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     n = len(x_data)
     polinomio = 0
     bases_str = []
+    bases_latex = []
     
     # Construcción del polinomio de Lagrange
     for i in range(n):
@@ -24,11 +25,12 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
                 l_i *= (x_sym - x_data[j]) / (x_data[i] - x_data[j])
         
         # Guardar la base (L_i)
-        l_i_simplificada = sp.expand(l_i)
+        l_i_simplificada = sp.nsimplify(sp.expand(l_i), tolerance=1e-10, rational=True)
         bases_str.append(str(l_i_simplificada))
+        bases_latex.append(sp.latex(l_i_simplificada))
         polinomio += y_data[i] * l_i
         
-    polinomio_expandido = sp.expand(polinomio)
+    polinomio_expandido = sp.nsimplify(sp.expand(polinomio), tolerance=1e-10, rational=True)
     
     # Evaluar en x0 si se proporciona
     valor_x0 = None
@@ -40,13 +42,18 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     
     # Análisis de error si hay función original y x0
     error_info = ""
+    errores_latex = []
     cota_error = None
     if fn is not None and x0 is not None:
         try:
             # Error local real
             valor_real = float(fn(x0))
             error_local = abs(valor_real - valor_x0)
-            error_info = f"\nAnálisis de Error:\n  Valor real f({x0}) = {valor_real:g}\n  Error local = {error_local:g}"
+            error_relativo = error_local / abs(valor_real) if valor_real != 0 else float('inf')
+            error_info = f"\nAnálisis de Error:\n  Valor real f({x0}) = {valor_real:g}\n  Error local = {error_local:g}\n  Error relativo = {error_relativo:g}"
+            errores_latex.append(f"\\text{{Valor real}} \\ f({x0}) = {valor_real:g}")
+            errores_latex.append(f"\\text{{Error Local}} = {error_local:g}")
+            errores_latex.append(f"\\text{{Error Relativo}} = {error_relativo:g}")
             
             # Cota de error teórico
             f_expr_str = kwargs.get("f_expr_str")
@@ -81,6 +88,7 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
                     
                 cota_error = (max_deriv / math.factorial(n)) * prod_nodal
                 error_info += f"\n  Cota de error teórico = {cota_error:g}"
+                errores_latex.append(f"\\text{{Error Global (Cota)}} = {cota_error:g}")
         except Exception as e:
             # Si falla el cálculo simbólico, mostramos solo lo que se pudo
             pass
@@ -99,7 +107,7 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     latex_str = sp.latex(polinomio_expandido)
         
     # Agregamos las bases al return como un cuarto elemento, y el látex del polinomio
-    return iteraciones, mensaje, str(polinomio_expandido), bases_str, ["i", "x", "y"], latex_str
+    return iteraciones, mensaje, str(polinomio_expandido), bases_str, ["i", "x", "y"], latex_str, bases_latex, errores_latex
 
 
 def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):

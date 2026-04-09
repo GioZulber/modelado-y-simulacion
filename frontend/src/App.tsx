@@ -343,10 +343,32 @@ function App() {
                   isSuccess={results.message && (results.message.includes("encontrado") || results.message.includes("encontrada") || results.message.includes("exitosamente"))} 
                 />
 
+                {results.bases_latex && results.bases_latex.length > 0 && (
+                  <div style={{ marginTop: '20px' }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 600, fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Bases de Lagrange Lᵢ(x)</p>
+                    {results.bases_latex.map((baseLatex: string, index: number) => (
+                      <div key={index} style={{ marginBottom: '10px' }}>
+                        <RenderLatex math={`L_{${index}}(x) = ${baseLatex}`} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {results.latex_str && (
                   <div style={{ marginTop: '20px' }}>
                     <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 600, fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Polinomio Interpolador P(x)</p>
                     <RenderLatex math={`P(x) = ${results.latex_str}`} />
+                  </div>
+                )}
+
+                {results.errores_latex && results.errores_latex.length > 0 && (
+                  <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-sm)' }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#f43f5e', fontWeight: 600, fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Análisis de Error</p>
+                    {results.errores_latex.map((errLatex: string, index: number) => (
+                      <div key={index} style={{ marginBottom: '8px' }}>
+                        <RenderLatex math={errLatex} />
+                      </div>
+                    ))}
                   </div>
                 )}
 

@@ -207,10 +207,20 @@ def solve(req: SolveRequest):
         plot_secondary = None
         plot_bases = []
         latex_str = None
+        bases_latex = None
+        errores_latex = None
         
         # Determine the shape of res
         if isinstance(res, tuple):
-            if len(res) >= 6: # iteraciones, mensaje, poly, bases, headers, latex
+            if len(res) >= 8: # iteraciones, mensaje, poly, bases, headers, latex, bases_latex, errores_latex
+                iterations, message, poly_expr, bases_expr, dynamic_headers, latex_str, bases_latex, errores_latex = res
+                if dynamic_headers:
+                    headers = dynamic_headers
+            elif len(res) == 7: # iteraciones, mensaje, poly, bases, headers, latex, bases_latex
+                iterations, message, poly_expr, bases_expr, dynamic_headers, latex_str, bases_latex = res
+                if dynamic_headers:
+                    headers = dynamic_headers
+            elif len(res) == 6: # iteraciones, mensaje, poly, bases, headers, latex
                 iterations, message, poly_expr, bases_expr, dynamic_headers, latex_str = res
                 if dynamic_headers:
                     headers = dynamic_headers
@@ -295,6 +305,8 @@ def solve(req: SolveRequest):
             "iterations": iterations,
             "message": message,
             "latex_str": latex_str,
+            "bases_latex": bases_latex,
+            "errores_latex": errores_latex,
             "plot": {"x": x_plot, "y": y_plot, "center": plot_center} if (plot_fn and len(x_plot) > 0) else None,
             "plot_secondary": plot_secondary,
             "plot_bases": plot_bases if len(plot_bases) > 0 else None,
