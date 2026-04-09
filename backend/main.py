@@ -27,9 +27,10 @@ class SolveRequest(BaseModel):
     g_expr: Optional[str] = ""
     x_data: Optional[str] = ""
     y_data: Optional[str] = ""
-    a: Optional[float] = None
-    b: Optional[float] = None
-    x0: Optional[float] = None
+    a: Optional[str] = None
+    b: Optional[str] = None
+    x0: Optional[str] = None
+    n: Optional[str] = None
     max_iter: int = 100
     tol: float = 1e-6
     precision: int = 8
@@ -43,6 +44,21 @@ def eval_math_expr(expr_str: str) -> float:
         return float(val)
     except Exception as e:
         raise ValueError(f"Could not evaluate '{expr_str}': {str(e)}")
+
+
+def parse_scalar_value(value: Optional[str], field_name: str) -> Optional[float]:
+    """Parse a scalar input that may contain expressions like pi, pi/2 or 2*e."""
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    try:
+        return eval_math_expr(text)
+    except Exception as exc:
+        raise ValueError(f"No se pudo interpretar {field_name}='{text}': {exc}") from exc
 
 # ---------------------------------------------------------------------------
 # Safe math expression evaluator using SymPy
@@ -141,6 +157,10 @@ def solve(req: SolveRequest):
 
     try:
         kwargs = {"max_iter": req.max_iter, "tol": req.tol, "precision": req.precision}
+        plot_span = 50
+        parsed_a = parse_scalar_value(req.a, "a")
+        parsed_b = parse_scalar_value(req.b, "b")
+        parsed_x0 = parse_scalar_value(req.x0, "x0")
 
         if "x_data" in requiere or "x_data" in opcionales:
             if req.x_data:
@@ -148,6 +168,12 @@ def solve(req: SolveRequest):
         if "y_data" in requiere or "y_data" in opcionales:
             if req.y_data:
                 kwargs["y_data"] = [eval_math_expr(y.strip()) for y in req.y_data.split(",") if y.strip()]
+        if "n" in requiere or "n" in opcionales:
+            if req.n is not None:
+                try:
+                    kwargs["n"] = int(str(req.n).strip())
+                except Exception as exc:
+                    raise ValueError(f"No se pudo interpretar n='{req.n}' como entero.") from exc
 
         plot_fn = None
         fn = None
@@ -174,23 +200,24 @@ def solve(req: SolveRequest):
             plot_fn = fn
 
         if ("a" in requiere and "b" in requiere) or ("a" in opcionales and "b" in opcionales):
-            if req.a is not None and req.b is not None:
-                res = resolver(fn, float(req.a), float(req.b), **kwargs)
-                plot_center = (req.a + req.b) / 2
+            if parsed_a is not None and parsed_b is not None:
+                res = resolver(fn, parsed_a, parsed_b, **kwargs)
+                plot_center = (parsed_a + parsed_b) / 2
+                plot_span = max(abs(parsed_b - parsed_a) * 0.75, 1)
             else:
                 res = resolver(fn, **kwargs)
                 plot_center = 0
         elif ("x0" in requiere or "x0" in opcionales) and "x_data" not in requiere:
-            if req.x0 is not None:
-                res = resolver(fn, float(req.x0), **kwargs)
-                plot_center = req.x0
+            if parsed_x0 is not None:
+                res = resolver(fn, parsed_x0, **kwargs)
+                plot_center = parsed_x0
             else:
                 res = resolver(fn, **kwargs)
                 plot_center = 0
         else:
-            if ("x0" in requiere or "x0" in opcionales) and req.x0 is not None:
+            if ("x0" in requiere or "x0" in opcionales) and parsed_x0 is not None:
                 try:
-                    kwargs["x0"] = float(req.x0)
+                    kwargs["x0"] = parsed_x0
                 except Exception:
                     pass
             res = resolver(fn, **kwargs)
@@ -199,6 +226,7 @@ def solve(req: SolveRequest):
                 min_x = min(kwargs["x_data"])
                 max_x = max(kwargs["x_data"])
                 plot_center = (min_x + max_x) / 2
+                plot_span = max((max_x - min_x) * 1.5, 5)
             else:
                 plot_center = 0
 
@@ -241,7 +269,7 @@ def solve(req: SolveRequest):
             if poly_expr is not None:
                 poly_fn = parse_function(poly_expr)
                 # Adjust span to encompass all nodes plus margin
-                span = 50
+                span = plot_span
                 if "x_data" in kwargs and kwargs["x_data"]:
                     min_x = min(kwargs["x_data"])
                     max_x = max(kwargs["x_data"])
@@ -250,7 +278,7 @@ def solve(req: SolveRequest):
                 plot_secondary = {"x": x_plot2, "y": y_plot2, "label": "P(x)"}
                 
             if bases_expr:
-                span = 50
+                span = plot_span
                 if "x_data" in kwargs and kwargs["x_data"]:
                     min_x = min(kwargs["x_data"])
                     max_x = max(kwargs["x_data"])
@@ -271,7 +299,7 @@ def solve(req: SolveRequest):
 
         x_plot, y_plot = [], []
         if plot_fn is not None:
-            span = 50
+            span = plot_span
             if "x_data" in kwargs and kwargs["x_data"]:
                 min_x = min(kwargs["x_data"])
                 max_x = max(kwargs["x_data"])

@@ -40,7 +40,6 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
     if (!containerRef.current || !window.Plotly) return;
 
     const traces: any[] = [];
-    const label = isFx ? 'f(x)' : 'g(x)';
 
     if (plotData) {
       traces.push({
@@ -129,15 +128,17 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
        const span = maxNodeX - minNodeX;
        xMin = minNodeX - (span * 0.2); // Add 20% margin
        xMax = maxNodeX + (span * 0.2);
-    } else if (mainPlot && mainPlot.x) {
-       const center = mainPlot.center || 0;
-       const xSpan = 5;
+    } else if (mainPlot && mainPlot.x.length > 0) {
+       const firstX = mainPlot.x[0];
+       const lastX = mainPlot.x[mainPlot.x.length - 1];
+       const center = 'center' in mainPlot ? mainPlot.center : (firstX + lastX) / 2;
+       const xSpan = Math.max(Math.abs(lastX - firstX) / 2, 5);
        xMin = center - xSpan;
        xMax = center + xSpan;
     }
 
     let yMin = Infinity, yMax = -Infinity;
-    if (mainPlot && mainPlot.x) {
+    if (mainPlot && mainPlot.x.length > 0) {
       for (let i = 0; i < mainPlot.x.length; i++) {
         if (mainPlot.x[i] >= xMin && mainPlot.x[i] <= xMax) {
           if (mainPlot.y[i] < yMin) yMin = mainPlot.y[i];

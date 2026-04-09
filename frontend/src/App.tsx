@@ -5,6 +5,90 @@ import { GraficoResultados } from './components/GraficoResultados';
 import { TablaIteraciones } from './components/TablaIteraciones';
 import { RenderLatex } from './components/RenderLatex';
 
+interface ResultMetric {
+  label: string;
+  value: string;
+}
+
+interface ParsedResultSummary {
+  title: string;
+  highlight: ResultMetric | null;
+  metrics: ResultMetric[];
+  notes: string[];
+}
+
+const HIGHLIGHT_PATTERNS = [
+  /integral aproximada/i,
+  /ra[ií]z/i,
+  /punto fijo/i,
+  /^p\(/i,
+  /valor aprox/i,
+  /x_aitken/i,
+  /error local/i,
+];
+
+function parseResultSummary(message?: string): ParsedResultSummary | null {
+  if (!message) return null;
+
+  const lines = message
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  let title = lines[0];
+  let highlight: ResultMetric | null = null;
+  const metrics: ResultMetric[] = [];
+  const notes: string[] = [];
+
+  const foundMatch = title.match(/^(.*?):\s*(.+?)\s+en la iteraci[oó]n\s+(\d+)$/i);
+  if (foundMatch) {
+    title = foundMatch[1].trim();
+    highlight = {
+      label: foundMatch[1].trim(),
+      value: foundMatch[2].trim(),
+    };
+    metrics.push({ label: 'Iteración', value: foundMatch[3].trim() });
+  }
+
+  for (const rawLine of lines.slice(1)) {
+    const line = rawLine.replace(/^[•-]\s*/, '').trim();
+    if (!line) continue;
+
+    const eqMatch = line.match(/^([^=]+?)\s*=\s*(.+)$/);
+    if (eqMatch) {
+      metrics.push({
+        label: eqMatch[1].trim(),
+        value: eqMatch[2].trim(),
+      });
+      continue;
+    }
+
+    const lastApproxMatch = line.match(/^.*[Úu]ltima aproximaci[oó]n:\s*(.+)$/);
+    if (lastApproxMatch) {
+      metrics.push({
+        label: 'Última aproximación',
+        value: lastApproxMatch[1].trim(),
+      });
+      continue;
+    }
+
+    notes.push(line);
+  }
+
+  if (!highlight) {
+    const highlightIndex = metrics.findIndex(metric =>
+      HIGHLIGHT_PATTERNS.some(pattern => pattern.test(metric.label))
+    );
+    if (highlightIndex >= 0) {
+      highlight = metrics.splice(highlightIndex, 1)[0];
+    }
+  }
+
+  return { title, highlight, metrics, notes };
+}
+
 function App() {
   const [methodsRegistry, setMethodsRegistry] = useState<any>({});
   const [methodGroups, setMethodGroups] = useState<any>({});
@@ -18,6 +102,7 @@ function App() {
     a: '1',
     b: '2',
     x0: '1',
+    n: '6',
     max_iter: '100',
     tol: '1e-6',
     precision: '8'
@@ -71,6 +156,7 @@ function App() {
   const currentInfo = methodsRegistry[selectedMethod] || {};
   const requires = currentInfo.requiere || [];
   const opcionales = currentInfo.opcionales || [];
+  const parsedSummary = parseResultSummary(results?.message);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputs(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -123,9 +209,10 @@ function App() {
       const res = await api.post('/api/solve', {
         method: selectedMethod,
         ...inputs,
-        a: inputs.a ? parseFloat(inputs.a) : undefined,
-        b: inputs.b ? parseFloat(inputs.b) : undefined,
-        x0: inputs.x0 ? parseFloat(inputs.x0) : undefined,
+        a: inputs.a || undefined,
+        b: inputs.b || undefined,
+        x0: inputs.x0 || undefined,
+        n: inputs.n || undefined,
         max_iter: parseInt(inputs.max_iter),
         tol: parseFloat(inputs.tol),
         precision: parseInt(inputs.precision)
@@ -179,6 +266,7 @@ function App() {
               <div className="form-group">
                 <label htmlFor="method-select">Método</label>
                 <select 
+                  className="method-select"
                   id="method-select" 
                   value={selectedMethod} 
                   onChange={e => {
@@ -283,22 +371,36 @@ function App() {
 
               <div className="form-grid half">
                 <div className={`form-group ${!isVisible('a') ? 'hidden' : ''}`}>
-                  <label htmlFor="input-a">a (Límite inferior)</label>
-                  <input type="number" name="a" id="input-a" step="any" value={inputs.a} onChange={handleInputChange} />
+                  <label htmlFor="input-a">
+                    a (Límite inferior)
+                    <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Acepta expresiones como `pi`, `pi/2` o `2*e`</span>
+                  </label>
+                  <input type="text" name="a" id="input-a" value={inputs.a} onChange={handleInputChange} />
                 </div>
                 
                 <div className={`form-group ${!isVisible('b') ? 'hidden' : ''}`}>
-                  <label htmlFor="input-b">b (Límite superior)</label>
-                  <input type="number" name="b" id="input-b" step="any" value={inputs.b} onChange={handleInputChange} />
+                  <label htmlFor="input-b">
+                    b (Límite superior)
+                    <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Acepta expresiones como `pi`, `pi/2` o `2*e`</span>
+                  </label>
+                  <input type="text" name="b" id="input-b" value={inputs.b} onChange={handleInputChange} />
                 </div>
               </div>
 
               <div className={`form-group ${!isVisible('x0') ? 'hidden' : ''}`}>
                 <label htmlFor="input-x0">
                   x₀ (Punto a evaluar)
-                  {opcionales.includes('x0') && <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Opcional</span>}
+                  {opcionales.includes('x0') && <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Opcional. También acepta `pi` o `pi/4`</span>}
                 </label>
-                <input type="number" name="x0" id="input-x0" step="any" value={inputs.x0} onChange={handleInputChange} />
+                <input type="text" name="x0" id="input-x0" value={inputs.x0} onChange={handleInputChange} />
+              </div>
+
+              <div className={`form-group ${!isVisible('n') ? 'hidden' : ''}`}>
+                <label htmlFor="input-n">
+                  n (Subintervalos)
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Par para Simpson 1/3 compuesta y múltiplo de 3 para Simpson 3/8 compuesta</span>
+                </label>
+                <input type="number" name="n" id="input-n" min="1" step="1" value={inputs.n} onChange={handleInputChange} />
               </div>
 
               <div className="form-grid half">
@@ -323,7 +425,7 @@ function App() {
               <span>{loading ? 'Calculando…' : '▶ Ejecutar Simulación'}</span>
             </button>
 
-            {message && (
+            {message && message.type === 'error' && (
               <div className={`message-banner ${message.type}`} style={{whiteSpace: 'pre-wrap'}}>
                 {message.text}
               </div>
@@ -337,6 +439,47 @@ function App() {
             <>
               <section className="card">
                 <div className="card-title"><span className="icon">📊</span> Datos y Resultados</div>
+
+                {parsedSummary && (
+                  <div className="result-summary">
+                    <div className="result-summary-header">
+                      <div>
+                        <p className="result-summary-kicker">Resumen</p>
+                        <h2 className="result-summary-title">{parsedSummary.title}</h2>
+                      </div>
+
+                      {parsedSummary.highlight && (
+                        <div className="result-highlight-card">
+                          <span className="result-highlight-label">{parsedSummary.highlight.label}</span>
+                          <strong className="result-highlight-value">{parsedSummary.highlight.value}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    {parsedSummary.metrics.length > 0 && (
+                      <div className="result-metrics-grid">
+                        {parsedSummary.metrics.map((metric, index) => (
+                          <div key={`${metric.label}-${index}`} className="result-metric-card">
+                            <span className="result-metric-label">{metric.label}</span>
+                            <strong className="result-metric-value">{metric.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {parsedSummary.notes.length > 0 && (
+                      <div className="result-notes-card">
+                        <p className="result-notes-title">Detalle</p>
+                        <div className="result-notes-list">
+                          {parsedSummary.notes.map((note, index) => (
+                            <p key={`${note}-${index}`} className="result-note-line">{note}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <TablaIteraciones 
                   headers={results.headers} 
                   iterations={results.iterations} 
