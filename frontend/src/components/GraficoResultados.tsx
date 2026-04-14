@@ -116,35 +116,73 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
       });
     }
 
-    const mainPlot = plotSecondaryData || plotData || (plotBasesData && plotBasesData.length > 0 ? plotBasesData[0] : null);
-    
-    let xMin = -5, xMax = 5;
-    
-    // Automatically calculate X boundaries if nodes are available
-    if (nodesData && nodesData.length > 1) {
-       const xs = nodesData.map(n => n.x);
-       const minNodeX = Math.min(...xs);
-       const maxNodeX = Math.max(...xs);
-       const span = maxNodeX - minNodeX;
-       xMin = minNodeX - (span * 0.2); // Add 20% margin
-       xMax = maxNodeX + (span * 0.2);
-    } else if (mainPlot && mainPlot.x.length > 0) {
-       const firstX = mainPlot.x[0];
-       const lastX = mainPlot.x[mainPlot.x.length - 1];
-       const center = 'center' in mainPlot ? mainPlot.center : (firstX + lastX) / 2;
-       const xSpan = Math.max(Math.abs(lastX - firstX) / 2, 5);
-       xMin = center - xSpan;
-       xMax = center + xSpan;
+    const primaryPlots: Array<{ x: number[]; y: number[]; center?: number }> = [];
+    if (plotData) primaryPlots.push(plotData);
+    if (plotSecondaryData) primaryPlots.push(plotSecondaryData);
+
+    const activePlots: Array<{ x: number[]; y: number[]; center?: number }> = [...primaryPlots];
+    if (plotBasesData && plotBasesData.length > 0) {
+      plotBasesData.forEach(base => activePlots.push(base));
     }
 
-    let yMin = Infinity, yMax = -Infinity;
-    if (mainPlot && mainPlot.x.length > 0) {
-      for (let i = 0; i < mainPlot.x.length; i++) {
-        if (mainPlot.x[i] >= xMin && mainPlot.x[i] <= xMax) {
-          if (mainPlot.y[i] < yMin) yMin = mainPlot.y[i];
-          if (mainPlot.y[i] > yMax) yMax = mainPlot.y[i];
+    const collectFiniteX = (series: Array<{ x: number[] }>) =>
+      series.flatMap(plot => plot.x).filter((v): v is number => Number.isFinite(v));
+
+    let xMin = -5, xMax = 5;
+
+    // Prefer node-driven range for interpolation methods.
+    if (nodesData && nodesData.length > 1) {
+       const xs = nodesData.map(n => n.x).filter(Number.isFinite);
+       const minNodeX = Math.min(...xs);
+       const maxNodeX = Math.max(...xs);
+       const span = Math.max(maxNodeX - minNodeX, 1);
+       xMin = minNodeX - (span * 0.2); // Add 20% margin
+       xMax = maxNodeX + (span * 0.2);
+    } else if (activePlots.length > 0) {
+       const xs = collectFiniteX(activePlots);
+       if (xs.length > 0) {
+         const minX = Math.min(...xs);
+         const maxX = Math.max(...xs);
+         const width = Math.max(maxX - minX, 10);
+         const margin = width * 0.05;
+         const center = (minX + maxX) / 2;
+         xMin = center - (width / 2) - margin;
+         xMax = center + (width / 2) + margin;
+       }
+    } else if (rootData && Number.isFinite(rootData.x)) {
+       xMin = rootData.x - 5;
+       xMax = rootData.x + 5;
+    }
+
+    const collectYBounds = (plots: Array<{ x: number[]; y: number[] }>) => {
+      let min = Infinity;
+      let max = -Infinity;
+
+      for (const plot of plots) {
+        const points = Math.min(plot.x.length, plot.y.length);
+        for (let i = 0; i < points; i++) {
+          const xVal = plot.x[i];
+          const yVal = plot.y[i];
+          if (!Number.isFinite(xVal) || !Number.isFinite(yVal)) continue;
+          if (xVal >= xMin && xVal <= xMax) {
+            if (yVal < min) min = yVal;
+            if (yVal > max) max = yVal;
+          }
         }
       }
+
+      return { min, max };
+    };
+
+    // Keep Lagrange readable: prioritize f(x)/P(x) scale, then fallback to all active plots.
+    let { min: yMin, max: yMax } = collectYBounds(primaryPlots);
+    if (yMin === Infinity || yMax === -Infinity) {
+      ({ min: yMin, max: yMax } = collectYBounds(activePlots));
+    }
+
+    if (rootData && Number.isFinite(rootData.y) && rootData.x >= xMin && rootData.x <= xMax) {
+      yMin = Math.min(yMin, rootData.y);
+      yMax = Math.max(yMax, rootData.y);
     }
     
     if (yMin === Infinity) { yMin = -10; yMax = 10; }

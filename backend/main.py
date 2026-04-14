@@ -203,7 +203,7 @@ def solve(req: SolveRequest):
             if parsed_a is not None and parsed_b is not None:
                 res = resolver(fn, parsed_a, parsed_b, **kwargs)
                 plot_center = (parsed_a + parsed_b) / 2
-                plot_span = max(abs(parsed_b - parsed_a) * 0.75, 1)
+                plot_span = max(abs(parsed_b - parsed_a) * 1.5, 5)
             else:
                 res = resolver(fn, **kwargs)
                 plot_center = 0
