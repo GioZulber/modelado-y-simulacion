@@ -1,6 +1,27 @@
 import math
 import sympy as sp
 import numpy as np
+import re
+from sympy.parsing.sympy_parser import (
+    parse_expr,
+    standard_transformations,
+    implicit_multiplication_application,
+    convert_xor,
+)
+
+
+_PARSER_TRANSFORMATIONS = standard_transformations + (
+    implicit_multiplication_application,
+    convert_xor,
+)
+
+
+def _parse_symbolic_expression(expr_str: str):
+    text = expr_str.strip()
+    text = re.sub(r'\be\b', 'E', text)
+    text = re.sub(r'\bx(\d+)\b', r'x**\1', text)
+    x = sp.Symbol('x')
+    return parse_expr(text, transformations=_PARSER_TRANSFORMATIONS, local_dict={"x": x}, evaluate=True)
 
 def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     if not x_data or not y_data:
@@ -58,9 +79,7 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
             # Cota de error teórico
             f_expr_str = kwargs.get("f_expr_str")
             if f_expr_str:
-                import re
-                expr_str = re.sub(r'\be\b', 'E', f_expr_str)
-                f_sym = sp.sympify(expr_str)
+                f_sym = _parse_symbolic_expression(f_expr_str)
                 # Derivada de orden n
                 f_deriv_n = sp.diff(f_sym, x_sym, n)
                 
@@ -173,9 +192,7 @@ def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):
             # Cota de error teórico
             f_expr_str = kwargs.get("f_expr_str")
             if f_expr_str:
-                import re
-                expr_str = re.sub(r'\be\b', 'E', f_expr_str)
-                f_sym = sp.sympify(expr_str)
+                f_sym = _parse_symbolic_expression(f_expr_str)
                 # Derivada de orden n
                 f_deriv_n = sp.diff(f_sym, x_sym, n)
                 

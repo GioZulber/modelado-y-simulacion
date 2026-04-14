@@ -5,6 +5,13 @@ from typing import Optional, Dict, Any, List
 import numpy as np
 import sympy as sp
 import math
+import re
+from sympy.parsing.sympy_parser import (
+    parse_expr,
+    standard_transformations,
+    implicit_multiplication_application,
+    convert_xor,
+)
 
 from metodos import REGISTRY
 
@@ -37,13 +44,34 @@ class SolveRequest(BaseModel):
 
 def eval_math_expr(expr_str: str) -> float:
     """Safely evaluates a single math expression to a float."""
-    import re
-    expr_str = re.sub(r'\be\b', 'E', expr_str)
+    expr = _parse_symbolic_expression(expr_str)
     try:
-        val = sp.sympify(expr_str).evalf()
+        val = expr.evalf()
         return float(val)
     except Exception as e:
         raise ValueError(f"Could not evaluate '{expr_str}': {str(e)}")
+
+
+_PARSER_TRANSFORMATIONS = standard_transformations + (
+    implicit_multiplication_application,
+    convert_xor,
+)
+
+
+def _normalize_expression(expr_str: str) -> str:
+    text = expr_str.strip()
+    text = re.sub(r'\be\b', 'E', text)
+    text = re.sub(r'\bx(\d+)\b', r'x**\1', text)
+    return text
+
+
+def _parse_symbolic_expression(expr_str: str) -> sp.Expr:
+    normalized = _normalize_expression(expr_str)
+    x = sp.Symbol('x')
+    try:
+        return parse_expr(normalized, transformations=_PARSER_TRANSFORMATIONS, local_dict={"x": x}, evaluate=True)
+    except Exception as exc:
+        raise ValueError(f"Error parsing expression '{expr_str}': {exc}") from exc
 
 
 def parse_scalar_value(value: Optional[str], field_name: str) -> Optional[float]:
@@ -71,17 +99,9 @@ def parse_function(expr_str: Optional[str]):
     if not expr_str:
         return None
     
-    # Reemplazar e por E SOLO si 'e' está solo (para el número de Euler).
-    # Si hacemos un replace simple de 'e', convertimos 'exp' en 'Exp', lo cual rompe Sympy.
-    import re
-    expr_str = re.sub(r'\be\b', 'E', expr_str)
-    
     try:
-        # Parse expression safely
         x = sp.Symbol('x')
-        # We use standard transformations to allow implicit multiplication if needed,
-        # but standard sympify is usually enough for well-formed math strings.
-        expr = sp.sympify(expr_str)
+        expr = _parse_symbolic_expression(expr_str)
         
         # Create a fast callable function using lambdify (uses numpy backend)
         # Adding some fallback functions just in case numpy doesn't cover something exactly
