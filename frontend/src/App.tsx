@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from './api';
+import { CalculadoraCalculo } from './components/CalculadoraCalculo';
 import { CalculadoraCientifica } from './components/CalculadoraCientifica';
 import { GraficoResultados } from './components/GraficoResultados';
 import { TablaIteraciones } from './components/TablaIteraciones';
@@ -90,6 +91,7 @@ function parseResultSummary(message?: string): ParsedResultSummary | null {
 }
 
 function App() {
+  const [workspaceMode, setWorkspaceMode] = useState<'numerical' | 'calculus'>('numerical');
   const [methodsRegistry, setMethodsRegistry] = useState<any>({});
   const [methodGroups, setMethodGroups] = useState<any>({});
   const [selectedMethod, setSelectedMethod] = useState<string>('');
@@ -254,8 +256,27 @@ function App() {
       <header className="app-header">
         <h1>Métodos Numéricos</h1>
         <p>Modelado y Simulación — Consola Científica</p>
+        <div className="workspace-tabs" role="tablist" aria-label="Área de trabajo">
+          <button
+            type="button"
+            className={`workspace-tab ${workspaceMode === 'numerical' ? 'active' : ''}`}
+            onClick={() => setWorkspaceMode('numerical')}
+          >
+            Métodos numéricos
+          </button>
+          <button
+            type="button"
+            className={`workspace-tab ${workspaceMode === 'calculus' ? 'active' : ''}`}
+            onClick={() => setWorkspaceMode('calculus')}
+          >
+            Derivadas e integrales
+          </button>
+        </div>
       </header>
 
+      {workspaceMode === 'calculus' ? (
+        <CalculadoraCalculo />
+      ) : (
       <main className="dashboard-layout">
         {/* PANEL IZQUIERDO: Configuración */}
         <aside className="config-panel">
@@ -585,6 +606,7 @@ function App() {
           )}
         </article>
       </main>
+      )}
     </div>
   );
 }

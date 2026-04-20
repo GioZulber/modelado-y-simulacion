@@ -42,6 +42,17 @@ class SolveRequest(BaseModel):
     tol: float = 1e-6
     precision: int = 8
 
+
+class CalculusRequest(BaseModel):
+    operation: str = Field(..., description="derivar o integrar")
+    expression: str = Field(..., min_length=1)
+    variable: str = "x"
+    order: int = Field(1, ge=1, le=6)
+    definite: bool = False
+    a: Optional[str] = None
+    b: Optional[str] = None
+
+
 def eval_math_expr(expr_str: str) -> float:
     """Safely evaluates a single math expression to a float."""
     expr = _parse_symbolic_expression(expr_str)
@@ -65,11 +76,31 @@ def _normalize_expression(expr_str: str) -> str:
     return text
 
 
-def _parse_symbolic_expression(expr_str: str) -> sp.Expr:
+def _parse_symbolic_expression(expr_str: str, variable: str = "x") -> sp.Expr:
     normalized = _normalize_expression(expr_str)
-    x = sp.Symbol('x')
+    if not re.match(r"^[A-Za-z_]\w*$", variable):
+        raise ValueError(f"Variable inválida '{variable}'")
+
+    symbol = sp.Symbol(variable)
+    local_dict = {
+        variable: symbol,
+        "E": sp.E,
+        "e": sp.E,
+        "pi": sp.pi,
+        "sin": sp.sin,
+        "cos": sp.cos,
+        "tan": sp.tan,
+        "asin": sp.asin,
+        "acos": sp.acos,
+        "atan": sp.atan,
+        "exp": sp.exp,
+        "log": sp.log,
+        "ln": sp.log,
+        "sqrt": sp.sqrt,
+        "abs": sp.Abs,
+    }
     try:
-        return parse_expr(normalized, transformations=_PARSER_TRANSFORMATIONS, local_dict={"x": x}, evaluate=True)
+        return parse_expr(normalized, transformations=_PARSER_TRANSFORMATIONS, local_dict=local_dict, evaluate=True)
     except Exception as exc:
         raise ValueError(f"Error parsing expression '{expr_str}': {exc}") from exc
 
@@ -147,6 +178,220 @@ def generate_plot_data(fn, center: float = 0, span: float = 50, n: int = 2000):
             pass
     return x_clean, y_vals
 
+
+# ---------------------------------------------------------------------------
+# Symbolic calculus helpers
+# ---------------------------------------------------------------------------
+def _step(title: str, detail: str, math_expr: str) -> Dict[str, str]:
+    return {"title": title, "detail": detail, "math": math_expr}
+
+
+def _d_operator(x: sp.Symbol) -> str:
+    return rf"\frac{{d}}{{d{sp.latex(x)}}}"
+
+
+def _integral_operator(expr: sp.Expr, x: sp.Symbol) -> str:
+    return rf"\int {sp.latex(expr)}\,d{sp.latex(x)}"
+
+
+def _is_constant(expr: sp.Expr, x: sp.Symbol) -> bool:
+    return not expr.has(x)
+
+
+def _format_plain(expr: sp.Expr) -> str:
+    text = str(sp.sstr(sp.simplify(expr)))
+    return re.sub(r"(?<=\d)\*(?=[A-Za-z_])", "", text)
+
+
+def _extract_inline_calculus_command(operation: str, expression: str) -> tuple[str, str]:
+    text = expression.strip()
+    lower_text = text.lower()
+    commands = {
+        "derivar": "derivar",
+        "derivada": "derivar",
+        "integrar": "integrar",
+        "integral": "integrar",
+    }
+
+    for command, normalized_operation in commands.items():
+        prefix = f"{command} "
+        if lower_text.startswith(prefix):
+            return normalized_operation, text[len(prefix):].strip()
+
+    return operation, text
+
+
+def _describe_derivative_rule(expr: sp.Expr, x: sp.Symbol) -> str:
+    if _is_constant(expr, x):
+        return "Derivada de una constante."
+
+    if expr == x:
+        return "Derivada de la variable respecto de sí misma."
+
+    if isinstance(expr, sp.Pow) and expr.base == x and _is_constant(expr.exp, x):
+        return "Regla de la potencia: el exponente baja multiplicando y luego se resta 1 al exponente."
+
+    coeff, rest = expr.as_coeff_Mul()
+    if coeff != 1 and rest.has(x):
+        return f"El factor constante {sp.sstr(coeff)} se conserva y se deriva el resto."
+
+    if isinstance(expr, sp.Mul):
+        return "Regla del producto para factores que dependen de la variable."
+
+    if expr.func in (sp.sin, sp.cos, sp.tan, sp.exp, sp.log, sp.sqrt):
+        arg = expr.args[0]
+        if arg == x:
+            return f"Regla directa para {expr.func.__name__}({sp.sstr(x)})."
+        return "Regla de la cadena: se deriva la función externa y luego la interna."
+
+    if isinstance(expr, sp.Pow) and expr.base.has(x):
+        return "Regla de la cadena aplicada a una potencia con base variable."
+
+    return "Simplificación simbólica de la derivada."
+
+
+def _describe_integral_rule(expr: sp.Expr, x: sp.Symbol) -> str:
+    if _is_constant(expr, x):
+        return "Integral de una constante: se multiplica por la variable."
+
+    if expr == x:
+        return "Regla de la potencia con exponente 1."
+
+    if isinstance(expr, sp.Pow) and expr.base == x and _is_constant(expr.exp, x):
+        if sp.simplify(expr.exp + 1) == 0:
+            return "Caso especial de la potencia -1: su integral es logaritmo natural."
+        return "Regla de la potencia: se suma 1 al exponente y se divide por el nuevo exponente."
+
+    coeff, rest = expr.as_coeff_Mul()
+    if coeff != 1 and rest.has(x):
+        return f"El factor constante {sp.sstr(coeff)} sale fuera de la integral."
+
+    if expr.func in (sp.sin, sp.cos, sp.exp):
+        return f"Regla directa para integrar {expr.func.__name__}({sp.sstr(x)})."
+
+    return "Resolución simbólica de la integral."
+
+
+def _derivative_steps(expr: sp.Expr, x: sp.Symbol, order: int) -> tuple[List[Dict[str, str]], sp.Expr]:
+    steps = [
+        _step(
+            "Expresión original",
+            "Se toma la función ingresada como punto de partida.",
+            sp.latex(expr),
+        )
+    ]
+
+    current = expr
+    for index in range(order):
+        result = sp.simplify(sp.diff(current, x))
+        deriv_label = "Derivada" if order == 1 else f"Derivada de orden {index + 1}"
+
+        if isinstance(current, sp.Add):
+            steps.append(
+                _step(
+                    f"{deriv_label}: linealidad",
+                    "Se deriva término a término porque la derivada de una suma es la suma de las derivadas.",
+                    rf"{_d_operator(x)}\left({sp.latex(current)}\right) = {sp.latex(result)}",
+                )
+            )
+            for term in current.args:
+                term_result = sp.simplify(sp.diff(term, x))
+                steps.append(
+                    _step(
+                        f"Término {sp.latex(term)}",
+                        _describe_derivative_rule(term, x),
+                        rf"{_d_operator(x)}\left({sp.latex(term)}\right) = {sp.latex(term_result)}",
+                    )
+                )
+        else:
+            steps.append(
+                _step(
+                    deriv_label,
+                    _describe_derivative_rule(current, x),
+                    rf"{_d_operator(x)}\left({sp.latex(current)}\right) = {sp.latex(result)}",
+                )
+            )
+
+        current = result
+
+    steps.append(
+        _step(
+            "Resultado final",
+            "Se simplifica la expresión obtenida.",
+            sp.latex(current),
+        )
+    )
+    return steps, current
+
+
+def _integral_steps(
+    expr: sp.Expr,
+    x: sp.Symbol,
+    definite: bool = False,
+    a_expr: Optional[sp.Expr] = None,
+    b_expr: Optional[sp.Expr] = None,
+) -> tuple[List[Dict[str, str]], sp.Expr]:
+    antiderivative = sp.simplify(sp.integrate(expr, x))
+    if antiderivative.has(sp.Integral):
+        raise ValueError("No se pudo resolver la integral simbólicamente con SymPy.")
+
+    steps = [
+        _step(
+            "Expresión original",
+            "Se toma la función ingresada como integrando.",
+            sp.latex(expr),
+        )
+    ]
+
+    if isinstance(expr, sp.Add):
+        steps.append(
+            _step(
+                "Linealidad",
+                "Se integra término a término porque la integral de una suma es la suma de las integrales.",
+                rf"{_integral_operator(expr, x)} = {sp.latex(antiderivative)} + C",
+            )
+        )
+        for term in expr.args:
+            term_result = sp.simplify(sp.integrate(term, x))
+            steps.append(
+                _step(
+                    f"Término {sp.latex(term)}",
+                    _describe_integral_rule(term, x),
+                    rf"{_integral_operator(term, x)} = {sp.latex(term_result)}",
+                )
+            )
+    else:
+        steps.append(
+            _step(
+                "Antiderivada",
+                _describe_integral_rule(expr, x),
+                rf"{_integral_operator(expr, x)} = {sp.latex(antiderivative)} + C",
+            )
+        )
+
+    if definite:
+        if a_expr is None or b_expr is None:
+            raise ValueError("Para una integral definida se necesitan los límites a y b.")
+        result = sp.simplify(antiderivative.subs(x, b_expr) - antiderivative.subs(x, a_expr))
+        steps.append(
+            _step(
+                "Evaluación en los límites",
+                "Se aplica el teorema fundamental del cálculo: F(b) - F(a).",
+                rf"\left[{sp.latex(antiderivative)}\right]_{{{sp.latex(a_expr)}}}^{{{sp.latex(b_expr)}}} = {sp.latex(result)}",
+            )
+        )
+    else:
+        result = antiderivative
+
+    steps.append(
+        _step(
+            "Resultado final",
+            "Se simplifica la expresión obtenida.",
+            sp.latex(result) if definite else rf"{sp.latex(result)} + C",
+        )
+    )
+    return steps, result
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -163,6 +408,61 @@ def list_methods():
             "headers": info["headers"],
         }
     return methods
+
+
+@app.post("/api/calculus")
+def calculate_symbolic(req: CalculusRequest):
+    """Calculate symbolic derivatives and integrals with explanatory steps."""
+    try:
+        operation = req.operation.strip().lower()
+        variable = req.variable.strip() or "x"
+        x = sp.Symbol(variable)
+        operation, expression_text = _extract_inline_calculus_command(operation, req.expression)
+        if not expression_text:
+            raise ValueError("Ingresá una expresión para calcular.")
+        expr = _parse_symbolic_expression(expression_text, variable)
+        a_expr = None
+        b_expr = None
+
+        if operation in ("derivar", "derivada", "derivative", "diff"):
+            steps, result = _derivative_steps(expr, x, req.order)
+            operation_label = "Derivada"
+            result_latex = sp.latex(result)
+            result_plain = _format_plain(result)
+            message = f"{operation_label} final: {result_plain}"
+        elif operation in ("integrar", "integral", "integrate"):
+            a_expr = _parse_symbolic_expression(req.a, variable) if req.a else None
+            b_expr = _parse_symbolic_expression(req.b, variable) if req.b else None
+            steps, result = _integral_steps(expr, x, req.definite, a_expr, b_expr)
+            operation_label = "Integral definida" if req.definite else "Integral indefinida"
+            result_latex = sp.latex(result) if req.definite else rf"{sp.latex(result)} + C"
+            result_plain = _format_plain(result) if req.definite else f"{_format_plain(result)} + C"
+            message = f"{operation_label} final: {result_plain}"
+        else:
+            raise ValueError("Operación no reconocida. Usá 'derivar' o 'integrar'.")
+
+        approximate = None
+        if operation in ("integrar", "integral", "integrate") and req.definite:
+            approximate = float(sp.N(result))
+
+        return {
+            "operation": operation_label,
+            "expression": _format_plain(expr),
+            "expression_latex": sp.latex(expr),
+            "variable": variable,
+            "order": req.order,
+            "definite": req.definite,
+            "lower_latex": sp.latex(a_expr) if a_expr is not None else None,
+            "upper_latex": sp.latex(b_expr) if b_expr is not None else None,
+            "result": result_plain,
+            "result_latex": result_latex,
+            "approximate": approximate,
+            "steps": steps,
+            "message": message,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 
 @app.post("/api/solve")
 def solve(req: SolveRequest):
