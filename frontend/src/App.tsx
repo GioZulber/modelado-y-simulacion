@@ -522,6 +522,12 @@ function App() {
                   <div style={{ marginTop: '20px' }}>
                     <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: 'var(--accent-cyan)', fontWeight: 600, fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Polinomio Interpolador P(x)</p>
                     <RenderLatex math={`P(x) = ${results.latex_str}`} />
+                    {results.latex_decimal_str && (
+                      <div style={{ marginTop: '10px' }}>
+                        <p style={{ margin: '0 0 6px 0', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Forma decimal</p>
+                        <RenderLatex math={`P(x) = ${results.latex_decimal_str}`} />
+                      </div>
+                    )}
                   </div>
                 )}
 

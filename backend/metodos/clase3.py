@@ -23,6 +23,49 @@ def _parse_symbolic_expression(expr_str: str):
     x = sp.Symbol('x')
     return parse_expr(text, transformations=_PARSER_TRANSFORMATIONS, local_dict={"x": x}, evaluate=True)
 
+
+def _format_decimal_number(value, decimals):
+    rounded_zero = 0.5 * 10 ** (-decimals)
+    if abs(value) < rounded_zero:
+        return "0"
+
+    formatted = f"{value:.{decimals}f}".rstrip("0").rstrip(".")
+    return "0" if formatted in ("", "-0") else formatted
+
+
+def _latex_decimal_polynomial(expr, x_sym, decimals):
+    polynomial = sp.Poly(sp.expand(expr), x_sym)
+    terms = []
+
+    for (degree,), coeff in polynomial.terms():
+        coeff_value = float(sp.N(coeff))
+        if _format_decimal_number(coeff_value, decimals) == "0":
+            continue
+
+        sign = "-" if coeff_value < 0 else "+"
+        coeff_abs = abs(coeff_value)
+        coeff_text = _format_decimal_number(coeff_abs, decimals)
+
+        if degree == 0:
+            term = coeff_text
+        elif degree == 1:
+            term = "x" if coeff_text == "1" else rf"{coeff_text}x"
+        else:
+            term = rf"x^{{{degree}}}" if coeff_text == "1" else rf"{coeff_text}x^{{{degree}}}"
+
+        terms.append((sign, term))
+
+    if not terms:
+        return "0"
+
+    first_sign, first_term = terms[0]
+    latex_terms = [first_term if first_sign == "+" else f"- {first_term}"]
+    for sign, term in terms[1:]:
+        latex_terms.append(f" {sign} {term}")
+
+    return "".join(latex_terms)
+
+
 def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     if not x_data or not y_data:
         raise ValueError("x_data y y_data son obligatorios para Lagrange")
@@ -124,9 +167,11 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
         iteraciones.append([i, x_data[i], y_data[i]])
         
     latex_str = sp.latex(polinomio_expandido)
+    decimal_precision = int(kwargs.get("precision", 8))
+    latex_decimal_str = _latex_decimal_polynomial(polinomio_expandido, x_sym, decimal_precision)
         
     # Agregamos las bases al return como un cuarto elemento, y el látex del polinomio
-    return iteraciones, mensaje, str(polinomio_expandido), bases_str, ["i", "x", "y"], latex_str, bases_latex, errores_latex
+    return iteraciones, mensaje, str(polinomio_expandido), bases_str, ["i", "x", "y"], latex_str, bases_latex, errores_latex, latex_decimal_str
 
 
 def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):
