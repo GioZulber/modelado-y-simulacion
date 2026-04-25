@@ -78,6 +78,18 @@ def trapecio(funcion, a, b, max_iter=100, tol=1e-6, precision=8):
     return _resolver_regla("Regla del trapecio", funcion, xs, pesos, factor, h, precision)
 
 
+def rectangulo_medio(funcion, a, b, n=None, max_iter=100, tol=1e-6, precision=8):
+    _asegurar_funcion(funcion)
+    _asegurar_intervalo(a, b)
+    n = _validar_subintervalos(n, minimo=1)
+
+    h = (b - a) / n
+    xs = [a + (i + 0.5) * h for i in range(n)]
+    pesos = [1] * n
+    factor = h
+    return _resolver_regla("Regla del rectangulo medio", funcion, xs, pesos, factor, h, precision, n=n)
+
+
 def trapecio_compuesto(funcion, a, b, n=None, max_iter=100, tol=1e-6, precision=8):
     _asegurar_funcion(funcion)
     _asegurar_intervalo(a, b)
@@ -153,6 +165,14 @@ def simpson_3_8_compuesta(funcion, a, b, n=None, max_iter=100, tol=1e-6, precisi
 
 
 METODOS = {
+    "rectangulo_medio": {
+        "nombre": "Regla del Rectangulo Medio",
+        "clase": "Clase 4: Integración (Newton-Cotes)",
+        "requiere": ["f_expr", "a", "b", "n"],
+        "headers": HEADERS,
+        "resolver": rectangulo_medio,
+        "root_col": None,
+    },
     "trapecio": {
         "nombre": "Regla del Trapecio",
         "clase": "Clase 4: Integración (Newton-Cotes)",

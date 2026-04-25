@@ -76,6 +76,10 @@ def _normalize_expression(expr_str: str) -> str:
     return text
 
 
+def _nth_root(index: Any, radicand: Any) -> sp.Expr:
+    return sp.Pow(radicand, sp.Integer(1) / index)
+
+
 def _parse_symbolic_expression(expr_str: str, variable: str = "x") -> sp.Expr:
     normalized = _normalize_expression(expr_str)
     if not re.match(r"^[A-Za-z_]\w*$", variable):
@@ -97,6 +101,7 @@ def _parse_symbolic_expression(expr_str: str, variable: str = "x") -> sp.Expr:
         "log": sp.log,
         "ln": sp.log,
         "sqrt": sp.sqrt,
+        "nroot": _nth_root,
         "abs": sp.Abs,
     }
     try:

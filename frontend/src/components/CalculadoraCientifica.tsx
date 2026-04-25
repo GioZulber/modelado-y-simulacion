@@ -14,6 +14,8 @@ interface Token {
 export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, targetLabel }) => {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isNthRootIndexOpen, setIsNthRootIndexOpen] = useState(false);
+  const [openBraceFunctions, setOpenBraceFunctions] = useState(0);
   const mathRef = useRef<HTMLDivElement>(null);
 
   const getCodeString = () => tokens.map(t => t.code).join('');
@@ -51,17 +53,54 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
   }, [tokens, isOpen]);
 
   const handleAction = (action: string) => {
-    if (action === 'clear') setTokens([]);
+    if (action === 'clear') {
+      setTokens([]);
+      setIsNthRootIndexOpen(false);
+      setOpenBraceFunctions(0);
+    }
     else if (action === 'backspace') setTokens(prev => prev.slice(0, -1));
     else if (action === 'insert') {
       onInsert(getCodeString());
       setTokens([]);
+      setIsNthRootIndexOpen(false);
+      setOpenBraceFunctions(0);
       setIsOpen(false);
     }
   };
 
   const handleToken = (code: string, latex: string) => {
     setTokens(prev => [...prev, { code, latex }]);
+  };
+
+  const handleBraceFunction = (code: string, latex: string) => {
+    setTokens(prev => [...prev, { code, latex }]);
+    setOpenBraceFunctions(prev => prev + 1);
+  };
+
+  const handleNthRoot = () => {
+    setTokens(prev => [...prev, { code: 'nroot(', latex: '\\sqrt[' }]);
+    setIsNthRootIndexOpen(true);
+    setOpenBraceFunctions(prev => prev + 1);
+  };
+
+  const handleSeparator = () => {
+    if (isNthRootIndexOpen) {
+      setTokens(prev => [...prev, { code: ',', latex: ']{' }]);
+      setIsNthRootIndexOpen(false);
+      return;
+    }
+
+    handleToken(',', ',\\,');
+  };
+
+  const handleBraceClose = () => {
+    if (openBraceFunctions > 0) {
+      setTokens(prev => [...prev, { code: ')', latex: '}' }]);
+      setOpenBraceFunctions(prev => Math.max(0, prev - 1));
+      return;
+    }
+
+    handleToken('', '}');
   };
 
   return (
@@ -144,7 +183,7 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
             <button type="button" className="sci-btn num" onClick={() => handleToken('6', '6')}>6</button>
             
             {/* Fila 4 */}
-            <button type="button" className="sci-btn func" onClick={() => handleToken('exp(', 'e^{')}>eˣ</button>
+            <button type="button" className="sci-btn func" onClick={() => handleBraceFunction('exp(', 'e^{')}>eˣ</button>
             <button type="button" className="sci-btn func" onClick={() => handleToken('log(', '\\ln(')}>ln</button>
             <button type="button" className="sci-btn op" onClick={() => handleToken('**', '^{')}>xⁿ</button>
             <button type="button" className="sci-btn num" onClick={() => handleToken('1', '1')}>1</button>
@@ -152,20 +191,20 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
             <button type="button" className="sci-btn num" onClick={() => handleToken('3', '3')}>3</button>
 
             {/* Fila 5 */}
-            <button type="button" className="sci-btn func" onClick={() => handleToken('sqrt(', '\\sqrt{')}>√</button>
+            <button type="button" className="sci-btn func" onClick={() => handleBraceFunction('sqrt(', '\\sqrt{')}>√</button>
+            <button type="button" className="sci-btn func" onClick={handleNthRoot}>n√</button>
             <button type="button" className="sci-btn op" onClick={() => handleToken('**2', '^{2}')}>x²</button>
-            <button type="button" className="sci-btn op" onClick={() => handleToken(',', ',\\,')}>,</button>
             <button type="button" className="sci-btn num" onClick={() => handleToken('0', '0')}>0</button>
             <button type="button" className="sci-btn num" onClick={() => handleToken('.', '.')}>.</button>
-            <button type="button" className="sci-btn action" onClick={() => handleToken('', '}')} style={{color: 'var(--text-primary)', border: '1px solid var(--accent-cyan)'}}>→</button>
+            <button type="button" className="sci-btn action" onClick={handleBraceClose} style={{color: 'var(--text-primary)', border: '1px solid var(--accent-cyan)'}}>→</button>
             
             {/* Fila 6 */}
             <button type="button" className="sci-btn op" onClick={() => handleToken(' + ', '+')}>+</button>
             <button type="button" className="sci-btn op" onClick={() => handleToken(' - ', '-')}>−</button>
             <button type="button" className="sci-btn op" onClick={() => handleToken(' * ', ' \\cdot ')}>×</button>
             <button type="button" className="sci-btn op" onClick={() => handleToken(' / ', '\\div ')}>÷</button>
+            <button type="button" className="sci-btn op" onClick={handleSeparator}>,</button>
             <button type="button" className="sci-btn action" onClick={() => handleAction('backspace')}>⌫</button>
-            <button type="button" className="sci-btn insert-btn" style={{ gridColumn: 'span 1', padding: '0.4rem' }} onClick={() => handleAction('insert')}>↵</button>
           </div>
           
           <button type="button" className="sci-btn insert-btn" style={{ width: '100%', marginTop: '0.5rem', gridColumn: 'auto' }} onClick={() => handleAction('insert')}>

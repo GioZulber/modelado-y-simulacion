@@ -2,6 +2,7 @@ import math
 import sympy as sp
 import numpy as np
 import re
+from fractions import Fraction
 from sympy.parsing.sympy_parser import (
     parse_expr,
     standard_transformations,
@@ -64,6 +65,21 @@ def _latex_decimal_polynomial(expr, x_sym, decimals):
         latex_terms.append(f" {sign} {term}")
 
     return "".join(latex_terms)
+
+
+def _readable_fraction_polynomial(expr, x_sym, max_denominator=1000):
+    polynomial = sp.Poly(sp.expand(expr), x_sym)
+    readable_expr = 0
+
+    for (degree,), coeff in polynomial.terms():
+        coeff_value = float(sp.N(coeff))
+        readable_coeff = Fraction(coeff_value).limit_denominator(max_denominator)
+        if readable_coeff.numerator == 0:
+            continue
+
+        readable_expr += sp.Rational(readable_coeff.numerator, readable_coeff.denominator) * x_sym ** degree
+
+    return sp.expand(readable_expr)
 
 
 def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
@@ -166,8 +182,9 @@ def resolver_lagrange(fn, x_data=None, y_data=None, x0=None, **kwargs):
     for i in range(n):
         iteraciones.append([i, x_data[i], y_data[i]])
         
-    latex_str = sp.latex(polinomio_expandido)
     decimal_precision = int(kwargs.get("precision", 8))
+    polinomio_fraccion_legible = _readable_fraction_polynomial(polinomio_expandido, x_sym)
+    latex_str = sp.latex(polinomio_fraccion_legible)
     latex_decimal_str = _latex_decimal_polynomial(polinomio_expandido, x_sym, decimal_precision)
         
     # Agregamos las bases al return como un cuarto elemento, y el látex del polinomio
