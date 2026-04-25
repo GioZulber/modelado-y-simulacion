@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BookOpen, X } from 'lucide-react';
 import api from './api';
 import { CalculadoraCalculo } from './components/CalculadoraCalculo';
 import { CalculadoraCientifica } from './components/CalculadoraCientifica';
@@ -16,6 +17,20 @@ interface ParsedResultSummary {
   highlight: ResultMetric | null;
   metrics: ResultMetric[];
   notes: string[];
+}
+
+interface TheoryFormula {
+  etiqueta: string;
+  latex: string;
+  detalle?: string;
+}
+
+interface MarcoTeorico {
+  titulo: string;
+  resumen: string;
+  formulas: TheoryFormula[];
+  pasos: string[];
+  condiciones: string[];
 }
 
 const HIGHLIGHT_PATTERNS = [
@@ -115,6 +130,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [results, setResults] = useState<any>(null);
+  const [theoryOpen, setTheoryOpen] = useState(false);
 
   const [plotOptions, setPlotOptions] = useState({
     showFx: false,
@@ -155,9 +171,23 @@ function App() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!theoryOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setTheoryOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [theoryOpen]);
+
   const currentInfo = methodsRegistry[selectedMethod] || {};
   const requires = currentInfo.requiere || [];
   const opcionales = currentInfo.opcionales || [];
+  const currentTheory = currentInfo.marco_teorico as MarcoTeorico | null | undefined;
   const parsedSummary = parseResultSummary(results?.message);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,6 +322,7 @@ function App() {
                   value={selectedMethod} 
                   onChange={e => {
                     setSelectedMethod(e.target.value);
+                    setTheoryOpen(false);
                     const info = methodsRegistry[e.target.value] || {};
                     const req = info.requiere || [];
                     const opt = info.opcionales || [];
@@ -307,6 +338,16 @@ function App() {
                     </optgroup>
                   ))}
                 </select>
+                {currentTheory && (
+                  <button
+                    type="button"
+                    className="btn-theory"
+                    onClick={() => setTheoryOpen(true)}
+                  >
+                    <BookOpen size={16} strokeWidth={1.8} aria-hidden="true" />
+                    <span>Ver marco teorico</span>
+                  </button>
+                )}
               </div>
 
               <div className={`form-group full-width ${!isVisible('f_expr') ? 'hidden' : ''}`}>
@@ -612,6 +653,75 @@ function App() {
           )}
         </article>
       </main>
+      )}
+
+      {theoryOpen && currentTheory && (
+        <div
+          className="theory-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setTheoryOpen(false)}
+        >
+          <section
+            className="theory-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="theory-title"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <div className="theory-modal-header">
+              <div>
+                <p className="theory-kicker">Marco teorico</p>
+                <h2 id="theory-title">{currentTheory.titulo}</h2>
+              </div>
+              <button
+                type="button"
+                className="theory-close-btn"
+                onClick={() => setTheoryOpen(false)}
+                aria-label="Cerrar marco teorico"
+              >
+                <X size={18} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            </div>
+
+            <p className="theory-summary">{currentTheory.resumen}</p>
+
+            <div className="theory-section">
+              <h3>Formulas</h3>
+              <div className="theory-formulas">
+                {currentTheory.formulas.map((formula, index) => (
+                  <article className="theory-formula" key={`${formula.etiqueta}-${index}`}>
+                    <div className="theory-formula-header">
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <strong>{formula.etiqueta}</strong>
+                    </div>
+                    <RenderLatex math={formula.latex} />
+                    {formula.detalle && <p>{formula.detalle}</p>}
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="theory-section theory-grid">
+              <div>
+                <h3>Paso a paso</h3>
+                <ol className="theory-list ordered">
+                  {currentTheory.pasos.map((paso, index) => (
+                    <li key={`${paso}-${index}`}>{paso}</li>
+                  ))}
+                </ol>
+              </div>
+
+              <div>
+                <h3>Condiciones</h3>
+                <ul className="theory-list">
+                  {currentTheory.condiciones.map((condicion, index) => (
+                    <li key={`${condicion}-${index}`}>{condicion}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

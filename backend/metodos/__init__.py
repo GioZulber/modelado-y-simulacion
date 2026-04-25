@@ -10,6 +10,8 @@ import importlib
 import pkgutil
 import pathlib
 
+from .marcos_teoricos import MARCOS_TEORICOS
+
 REGISTRY: dict = {}
 
 
@@ -23,7 +25,11 @@ def _discover():
         module = importlib.import_module(f".{module_name}", package=__name__)
         metodos = getattr(module, "METODOS", None)
         if isinstance(metodos, dict):
-            REGISTRY.update(metodos)
+            for key, info in metodos.items():
+                REGISTRY[key] = {
+                    **info,
+                    "marco_teorico": MARCOS_TEORICOS.get(key),
+                }
 
 
 _discover()

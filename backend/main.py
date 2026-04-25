@@ -411,6 +411,7 @@ def list_methods():
             "requiere": info["requiere"],
             "opcionales": info.get("opcionales", []),
             "headers": info["headers"],
+            "marco_teorico": info.get("marco_teorico"),
         }
     return methods
 
