@@ -399,4 +399,54 @@ MARCOS_TEORICOS = {
             "Es util cuando la cantidad de subintervalos se organiza naturalmente en bloques de tres.",
         ],
     },
+    "monte_carlo_integral": {
+        "titulo": "Metodo de Monte Carlo para Integrales",
+        "resumen": "Aproxima integrales en una o mas dimensiones usando muestras aleatorias uniformes sobre el dominio.",
+        "formulas": [
+            {
+                "etiqueta": "Dominio",
+                "latex": r"D=[a_1,b_1]\times\cdots\times[a_d,b_d]",
+                "detalle": "El dominio se define con un intervalo por variable.",
+            },
+            {
+                "etiqueta": "Estimador",
+                "latex": r"\hat I_N = V(D)\frac{1}{N}\sum_{i=1}^{N} f(U_i)",
+                "detalle": "Cada U_i es un punto aleatorio uniforme en D y V(D) es el volumen del dominio.",
+            },
+            {
+                "etiqueta": "Error estandar",
+                "latex": r"SE(\hat I_N)=V(D)\frac{s_N}{\sqrt{N}}",
+                "detalle": "La incertidumbre baja proporcionalmente a 1/sqrt(N).",
+            },
+            {
+                "etiqueta": "Intervalo de confianza",
+                "latex": r"\hat I \pm z_{\alpha/2}\frac{s}{\sqrt{n}}",
+                "detalle": "Para un nivel de confianza C, alpha = 1 - C. En una integral sobre un dominio de volumen V(D), se usa s = V(D)s_f, donde s_f es el desvio muestral de f(U).",
+            },
+            {
+                "etiqueta": "Relacion error-muestras",
+                "latex": r"E_n \approx z_{\alpha/2}\frac{s}{\sqrt{n}}\quad\Rightarrow\quad \frac{E_2}{E_1}\approx\sqrt{\frac{n_1}{n_2}}",
+                "detalle": "El error baja con la raiz cuadrada de n: para reducir el error a la mitad se necesitan aproximadamente cuatro veces mas muestras.",
+            },
+            {
+                "etiqueta": "Muestras necesarias",
+                "latex": r"n_2\approx n_1\left(\frac{E_1}{E_2}\right)^2",
+                "detalle": "Si se quiere dividir el error por k, entonces hay que multiplicar la cantidad de muestras por k^2.",
+            },
+        ],
+        "pasos": [
+            "Definir las variables y los limites del dominio.",
+            "Generar puntos aleatorios uniformes dentro de ese dominio.",
+            "Evaluar la funcion en cada punto generado.",
+            "Promediar los valores y multiplicar por el volumen del dominio.",
+            "Elegir el nivel de confianza y calcular el valor critico z correspondiente.",
+            "Estimar el error estandar y construir el intervalo de confianza aproximado.",
+            "Para reducir el error, aumentar n: si se busca la mitad del error, usar aproximadamente 4n muestras.",
+        ],
+        "condiciones": [
+            "La funcion debe poder evaluarse en todo el dominio indicado.",
+            "El metodo es probabilistico: distintas semillas pueden dar aproximaciones levemente distintas.",
+            "Aumentar n reduce el error esperado, aunque la convergencia es lenta: orden 1/sqrt(n).",
+        ],
+    },
 }

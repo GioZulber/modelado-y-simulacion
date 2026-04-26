@@ -34,6 +34,10 @@ class SolveRequest(BaseModel):
     g_expr: Optional[str] = ""
     x_data: Optional[str] = ""
     y_data: Optional[str] = ""
+    variables: Optional[str] = ""
+    bounds: Optional[str] = ""
+    seed: Optional[str] = None
+    confidence_level: Optional[str] = None
     a: Optional[str] = None
     b: Optional[str] = None
     x0: Optional[str] = None
@@ -480,6 +484,7 @@ def solve(req: SolveRequest):
     opcionales = info.get("opcionales", [])
     resolver = info["resolver"]
     root_col = info["root_col"]
+    uses_raw_expression = info.get("uses_raw_expression", False)
 
     try:
         kwargs = {"max_iter": req.max_iter, "tol": req.tol, "precision": req.precision}
@@ -494,6 +499,14 @@ def solve(req: SolveRequest):
         if "y_data" in requiere or "y_data" in opcionales:
             if req.y_data:
                 kwargs["y_data"] = [eval_math_expr(y.strip()) for y in req.y_data.split(",") if y.strip()]
+        if "variables" in requiere or "variables" in opcionales:
+            kwargs["variables"] = req.variables
+        if "bounds" in requiere or "bounds" in opcionales:
+            kwargs["bounds"] = req.bounds
+        if "seed" in requiere or "seed" in opcionales:
+            kwargs["seed"] = req.seed
+        if "confidence_level" in requiere or "confidence_level" in opcionales:
+            kwargs["confidence_level"] = req.confidence_level
         if "n" in requiere or "n" in opcionales:
             if req.n is not None:
                 try:
@@ -510,10 +523,13 @@ def solve(req: SolveRequest):
                 fn = parse_function(req.g_expr)
         if "f_expr" in requiere or "f_expr" in opcionales:
             if req.f_expr:
-                f_fn = parse_function(req.f_expr)
-                if ("g_expr" not in requiere) and ("g_expr" not in opcionales):
-                    fn = f_fn
-                plot_fn = f_fn
+                if uses_raw_expression:
+                    kwargs["f_expr_str"] = req.f_expr
+                else:
+                    f_fn = parse_function(req.f_expr)
+                    if ("g_expr" not in requiere) and ("g_expr" not in opcionales):
+                        fn = f_fn
+                    plot_fn = f_fn
 
         # Only pass string expressions to methods that explicitly support/need them
         if req.method in ["lagrange", "newton_dif_div"]:

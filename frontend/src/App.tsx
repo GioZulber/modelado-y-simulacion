@@ -116,6 +116,10 @@ function App() {
     g_expr: '',
     x_data: '0, 1, 2',
     y_data: '1, 3, 0',
+    variables: 'x',
+    bounds: '0,1',
+    seed: '',
+    confidence_level: '95',
     a: '1',
     b: '2',
     x0: '1',
@@ -272,6 +276,9 @@ function App() {
     if (hasF && hasG) {
       return activeInput === 'f_expr' ? 'f(x)' : 'g(x)';
     } else if (hasF) {
+      if (requires.includes('variables') || opcionales.includes('variables')) {
+        return `f(${inputs.variables.trim() || 'x'})`;
+      }
       return 'f(x)';
     } else {
       return 'g(x)';
@@ -280,6 +287,11 @@ function App() {
 
   const isVisible = (field: string) => requires.includes(field) || opcionales.includes(field);
   const isAnyPlotActive = plotOptions.showFx || plotOptions.showPx || plotOptions.showBases;
+  const functionSignature = isVisible('variables') ? `f(${inputs.variables.trim() || 'x'})` : 'f(x)';
+  const nFieldLabel = selectedMethod === 'monte_carlo_integral' ? 'n (Muestras)' : 'n (Subintervalos)';
+  const nFieldHint = selectedMethod === 'monte_carlo_integral'
+    ? 'Cantidad de puntos aleatorios. Mas muestras reducen el error como 1/sqrt(n).'
+    : 'Par para Simpson 1/3 compuesta y múltiplo de 3 para Simpson 3/8 compuesta';
 
   return (
     <div className="app-container">
@@ -321,12 +333,23 @@ function App() {
                   id="method-select" 
                   value={selectedMethod} 
                   onChange={e => {
-                    setSelectedMethod(e.target.value);
+                    const nextMethod = e.target.value;
+                    setSelectedMethod(nextMethod);
                     setTheoryOpen(false);
-                    const info = methodsRegistry[e.target.value] || {};
+                    const info = methodsRegistry[nextMethod] || {};
                     const req = info.requiere || [];
                     const opt = info.opcionales || [];
                     setActiveInput((req.includes('f_expr') || opt.includes('f_expr')) ? 'f_expr' : 'g_expr');
+                    if (nextMethod === 'monte_carlo_integral') {
+                      setInputs(prev => ({
+                        ...prev,
+                        f_expr: prev.f_expr || 'x^2',
+                        variables: prev.variables || 'x',
+                        bounds: prev.bounds || '0,1',
+                        n: prev.n === '6' ? '10000' : prev.n,
+                        confidence_level: prev.confidence_level || '95',
+                      }));
+                    }
                   }}
                 >
                   {Object.keys(methodGroups).length === 0 && <option value="">Cargando métodos…</option>}
@@ -352,7 +375,7 @@ function App() {
 
               <div className={`form-group full-width ${!isVisible('f_expr') ? 'hidden' : ''}`}>
                 <label htmlFor="input-fx">
-                  f(x) 
+                  {functionSignature} 
                   {opcionales.includes('f_expr') && <span className="field-hint">Opcional para evaluar error o graficar</span>}
                   {!opcionales.includes('f_expr') && <span className="field-hint">Expresión que se envía al método</span>}
                 </label>
@@ -366,6 +389,38 @@ function App() {
                   value={inputs.f_expr}
                   onChange={handleInputChange}
                   onFocus={() => setActiveInput('f_expr')}
+                />
+              </div>
+
+              <div className={`form-group full-width ${!isVisible('variables') ? 'hidden' : ''}`}>
+                <label htmlFor="input-variables">
+                  Variables
+                  <span className="field-hint">Separadas por coma y en el mismo orden que los limites. Ej: x,y,z</span>
+                </label>
+                <input
+                  type="text"
+                  name="variables"
+                  id="input-variables"
+                  placeholder="ej. x,y"
+                  autoComplete="off"
+                  value={inputs.variables}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className={`form-group full-width ${!isVisible('bounds') ? 'hidden' : ''}`}>
+                <label htmlFor="input-bounds">
+                  Limites del dominio
+                  <span className="field-hint">Un par por variable. Ej 1D: 0,1 | 2D: 0,1; -1,1 | acepta pi y e</span>
+                </label>
+                <input
+                  type="text"
+                  name="bounds"
+                  id="input-bounds"
+                  placeholder="ej. 0,1; 0,pi"
+                  autoComplete="off"
+                  value={inputs.bounds}
+                  onChange={handleInputChange}
                 />
               </div>
 
@@ -459,10 +514,35 @@ function App() {
 
               <div className={`form-group ${!isVisible('n') ? 'hidden' : ''}`}>
                 <label htmlFor="input-n">
-                  n (Subintervalos)
-                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Par para Simpson 1/3 compuesta y múltiplo de 3 para Simpson 3/8 compuesta</span>
+                  {nFieldLabel}
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>{nFieldHint}</span>
                 </label>
                 <input type="number" name="n" id="input-n" min="1" step="1" value={inputs.n} onChange={handleInputChange} />
+              </div>
+
+              <div className={`form-group ${!isVisible('seed') ? 'hidden' : ''}`}>
+                <label htmlFor="input-seed">
+                  Semilla
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Opcional, para repetir exactamente la misma simulacion</span>
+                </label>
+                <input type="number" name="seed" id="input-seed" step="1" value={inputs.seed} onChange={handleInputChange} />
+              </div>
+
+              <div className={`form-group ${!isVisible('confidence_level') ? 'hidden' : ''}`}>
+                <label htmlFor="input-confidence-level">
+                  Nivel de confianza (%)
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Ej: 90, 95 o 99</span>
+                </label>
+                <input
+                  type="number"
+                  name="confidence_level"
+                  id="input-confidence-level"
+                  min="0.01"
+                  max="99.99"
+                  step="0.01"
+                  value={inputs.confidence_level}
+                  onChange={handleInputChange}
+                />
               </div>
 
               <div className="form-grid half">
