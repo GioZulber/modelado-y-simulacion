@@ -466,33 +466,58 @@ MARCOS_TEORICOS = {
         "formulas": [
             {
                 "etiqueta": "Dominio",
-                "latex": r"D=[a_1,b_1]\times\cdots\times[a_d,b_d]",
-                "detalle": "El dominio se define con un intervalo por variable.",
+                "latex": r"\begin{aligned} D&=[a_1,b_1]\times\cdots\times[a_d,b_d]\\ V(D)&=\prod_{j=1}^{d}(b_j-a_j) \end{aligned}",
+                "detalle": "El dominio se define con un intervalo por variable. En una dimension, V(D)=b-a.",
             },
             {
-                "etiqueta": "Estimador",
-                "latex": r"\hat I_N = V(D)\frac{1}{N}\sum_{i=1}^{N} f(U_i)",
-                "detalle": "Cada U_i es un punto aleatorio uniforme en D y V(D) es el volumen del dominio.",
+                "etiqueta": "Media muestral",
+                "latex": r"\bar{\mu}=\frac{1}{n}\sum_{i=1}^{n}f(x_i)",
+                "detalle": "Los x_i son puntos aleatorios uniformes en el dominio. Esta es la media muestral de los valores f(x_i).",
+            },
+            {
+                "etiqueta": "Estimador de la integral",
+                "latex": r"\hat I=(b-a)\left[\frac{1}{n}\sum_{i=1}^{n}f(x_i)\right]=(b-a)\bar{\mu}",
+                "detalle": "Esta es la forma de una dimension del apunte. Para varias dimensiones el simulador reemplaza b-a por V(D).",
+            },
+            {
+                "etiqueta": "Varianza muestral",
+                "latex": r"S^2=\frac{1}{n-1}\sum_{i=1}^{n}\left(f(x_i)-\bar{\mu}\right)^2",
+                "detalle": "Es la varianza muestral de los valores evaluados f(x_i).",
+            },
+            {
+                "etiqueta": "Desvio muestral",
+                "latex": r"S=\sqrt{\frac{1}{n-1}\sum_{i=1}^{n}\left(f(x_i)-\bar{\mu}\right)^2}",
+                "detalle": "Es la raiz de la varianza muestral y se usa para estimar la dispersion.",
+            },
+            {
+                "etiqueta": "Varianza del estimador",
+                "latex": r"\operatorname{Var}(\hat I)\approx \frac{(b-a)^2S^2}{n}",
+                "detalle": "Mide la dispersion esperada de la integral estimada. Para varias dimensiones se reemplaza b-a por V(D).",
             },
             {
                 "etiqueta": "Error estandar",
-                "latex": r"SE(\hat I_N)=V(D)\frac{s_N}{\sqrt{N}}",
-                "detalle": "La incertidumbre baja proporcionalmente a 1/sqrt(N).",
+                "latex": r"SE(\hat I)=(b-a)\frac{S}{\sqrt{n}}",
+                "detalle": "Es la dispersion estimada de la integral aproximada.",
+            },
+            {
+                "etiqueta": "Error estimado",
+                "latex": r"EE=(b-a)\frac{S\cdot z_{1-\alpha}}{\sqrt{n}}",
+                "detalle": "El z corresponde al nivel de confianza elegido.",
             },
             {
                 "etiqueta": "Intervalo de confianza",
-                "latex": r"\hat I \pm z_{\alpha/2}\frac{s}{\sqrt{n}}",
-                "detalle": "Para un nivel de confianza C, alpha = 1 - C. En una integral sobre un dominio de volumen V(D), se usa s = V(D)s_f, donde s_f es el desvio muestral de f(U).",
+                "latex": r"IC=\hat I\pm EE",
+                "detalle": "El simulador informa el extremo inferior y superior como [I_hat - EE, I_hat + EE].",
             },
             {
                 "etiqueta": "Relacion error-muestras",
-                "latex": r"E_n \approx z_{\alpha/2}\frac{s}{\sqrt{n}}\quad\Rightarrow\quad \frac{E_2}{E_1}\approx\sqrt{\frac{n_1}{n_2}}",
+                "latex": r"E_n\approx (b-a)\frac{S\,z_{1-\alpha}}{\sqrt{n}}\quad\Rightarrow\quad \frac{E_2}{E_1}\approx\sqrt{\frac{n_1}{n_2}}",
                 "detalle": "El error baja con la raiz cuadrada de n: para reducir el error a la mitad se necesitan aproximadamente cuatro veces mas muestras.",
             },
             {
                 "etiqueta": "Muestras necesarias",
-                "latex": r"n_2\approx n_1\left(\frac{E_1}{E_2}\right)^2",
-                "detalle": "Si se quiere dividir el error por k, entonces hay que multiplicar la cantidad de muestras por k^2.",
+                "latex": r"n_{\text{nec}}=\left\lceil\left(\frac{(b-a)S\,z_{1-\alpha}}{E_{\max}}\right)^2\right\rceil",
+                "detalle": "Para una dimension se reemplaza V(D) por b-a. E_max es el error maximo tolerado.",
             },
         ],
         "pasos": [

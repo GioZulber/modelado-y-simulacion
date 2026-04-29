@@ -16,6 +16,7 @@ HEADERS = [
     "Bloque",
     "Muestras acum.",
     "Media f",
+    "Varianza f",
     "Volumen",
     "Integral estimada",
     "Error est.",
@@ -323,6 +324,7 @@ def monte_carlo_integral(
             sample_var = max((total_sq - (total * total) / endpoint) / (endpoint - 1), 0.0)
             standard_error = absolute_volume * math.sqrt(sample_var / endpoint)
         else:
+            sample_var = 0.0
             standard_error = 0.0
 
         estimate = signed_volume * mean
@@ -332,6 +334,7 @@ def monte_carlo_integral(
                 block_index,
                 endpoint,
                 _format_number(mean, precision),
+                _format_number(sample_var, precision),
                 _format_number(signed_volume, precision),
                 _format_number(estimate, precision),
                 _format_number(standard_error, precision),
@@ -340,9 +343,11 @@ def monte_carlo_integral(
         )
 
     mean = float(np.mean(values))
+    sample_var = float(np.var(values, ddof=1))
     sample_std = float(np.std(values, ddof=1))
     estimate = signed_volume * mean
     standard_error = absolute_volume * sample_std / math.sqrt(n_samples)
+    estimator_variance = standard_error * standard_error
     ci_margin = z_value * standard_error
     lower_ci = estimate - ci_margin
     upper_ci = estimate + ci_margin
@@ -362,7 +367,9 @@ def monte_carlo_integral(
         f"  muestras = {n_samples}",
         f"  volumen = {_format_message_number(signed_volume, precision)}",
         f"  media muestral = {_format_message_number(mean, precision)}",
+        f"  varianza muestral f = {_format_message_number(sample_var, precision)}",
         f"  desvio muestral f = {_format_message_number(sample_std, precision)}",
+        f"  varianza del estimador = {_format_message_number(estimator_variance, precision)}",
         f"  error estandar = {_format_message_number(standard_error, precision)}",
         f"  nivel confianza = {confidence_label}%",
         f"  z confianza = {_format_message_number(z_value, precision)}",
