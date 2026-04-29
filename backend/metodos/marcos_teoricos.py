@@ -144,6 +144,21 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} E(x) &= \frac{f^{(n+1)}(\xi)}{(n+1)!}\\ &\quad \prod_{i=0}^{n}(x-x_i) \end{aligned}",
                 "detalle": "Si se conoce f, esta expresion permite estimar el error de interpolacion.",
             },
+            {
+                "etiqueta": "Error de truncamiento (cota)",
+                "latex": r"\begin{aligned} |E(x)| &\le \frac{M_{n+1}}{(n+1)!}\,\big|\omega_{n+1}(x)\big|,\\ \omega_{n+1}(x) &= \prod_{i=0}^{n}(x-x_i),\quad M_{n+1}=\max_{\xi\in[a,b]}|f^{(n+1)}(\xi)| \end{aligned}",
+                "detalle": "Cota general del error de truncamiento usando el maximo de la derivada de orden n+1 en [a,b].",
+            },
+            {
+                "etiqueta": "Error local (en x_0)",
+                "latex": r"\begin{aligned} |E(x_0)| &\le \frac{M_{n+1}}{(n+1)!}\,\prod_{i=0}^{n}|x_0-x_i| \end{aligned}",
+                "detalle": "Cota del error puntual al evaluar en x_0; si se conoce f, el error local real es |f(x_0)-P_n(x_0)|.",
+            },
+            {
+                "etiqueta": "Error local real (si se conoce f)",
+                "latex": r"\begin{aligned} E_{\text{loc}}(x_0) &= \big| f(x_0) - P_n(x_0) \big| \end{aligned}",
+                "detalle": "Definicion exacta del error puntual cuando se conoce la funcion f.",
+            },
         ],
         "pasos": [
             "Ingresar los nodos x_data y sus valores y_data.",

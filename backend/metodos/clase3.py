@@ -231,7 +231,7 @@ def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):
         producto_nodal *= (x_sym - x_usar[i-1])
         P += coeficientes[i] * producto_nodal
         
-    polinomio_expandido = sp.expand(P)
+    polinomio_expandido = sp.nsimplify(sp.expand(P), tolerance=1e-10, rational=True)
     
     # Evaluar en x0 si se proporciona
     valor_x0 = None
@@ -288,7 +288,22 @@ def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):
 
     mensaje = "Interpolación de Newton completada exitosamente."
     if x0 is not None:
+        h_info = ""
+        sorted_x = sorted(x_data)
+        if len(sorted_x) > 1:
+            diffs = [sorted_x[i + 1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
+            finite_diffs = [d for d in diffs if d != 0]
+            if finite_diffs:
+                min_diff = min(finite_diffs)
+                max_diff = max(finite_diffs)
+                if abs(max_diff - min_diff) < 1e-9:
+                    h_info = f"\n  h = {min_diff:g}"
+                else:
+                    h_avg = sum(finite_diffs) / len(finite_diffs)
+                    h_info = f"\n  h_prom = {h_avg:g} (nodos no equiespaciados)"
         mensaje += f"\n\nNodos ordenados (centrados respecto a x0={x0}):\nx: {x_usar}\ny: {y_usar}"
+        if h_info:
+            mensaje += h_info
         if valor_x0 is not None:
             mensaje += f"\n\nEvaluación en x0={x0}:\n  P({x0}) = {valor_x0:g}"
     else:
@@ -307,10 +322,13 @@ def resolver_newton(fn, x_data=None, y_data=None, x0=None, **kwargs):
         
     headers = ["i", "x", "f[x0]"] + [f"f[..{j}]" for j in range(1, n)]
 
-    latex_str = sp.latex(polinomio_expandido)
+    decimal_precision = int(kwargs.get("precision", 8))
+    polinomio_fraccion_legible = _readable_fraction_polynomial(polinomio_expandido, x_sym)
+    latex_str = sp.latex(polinomio_fraccion_legible)
+    latex_decimal_str = _latex_decimal_polynomial(polinomio_expandido, x_sym, decimal_precision)
 
     # Newton no devuelve bases
-    return iteraciones, mensaje, str(polinomio_expandido), None, headers, latex_str
+    return iteraciones, mensaje, str(polinomio_expandido), None, headers, latex_str, None, None, latex_decimal_str
 
 
 METODOS = {

@@ -719,6 +719,45 @@ def solve(req: SolveRequest):
 
         is_fx = "f_expr" in requiere or "f_expr" in opcionales
 
+        method_class = info.get("clase", "")
+        is_newton_cotes = "Newton-Cotes" in method_class
+        plot_window = None
+        integration_window = None
+
+        def _make_bounds_window(a_val: float, b_val: float, margin_ratio: float = 0.15, min_margin: float = 0.5):
+            lo = min(a_val, b_val)
+            hi = max(a_val, b_val)
+            span = max(hi - lo, 1e-9)
+            margin = max(span * margin_ratio, min_margin)
+            return {"x_min": lo - margin, "x_max": hi + margin}
+
+        def _make_center_window(center_val: float, half_width: float = 10.0):
+            return {"x_min": center_val - half_width, "x_max": center_val + half_width}
+
+        if is_newton_cotes and parsed_a is not None and parsed_b is not None:
+            integration_window = {
+                "x_min": min(parsed_a, parsed_b),
+                "x_max": max(parsed_a, parsed_b),
+            }
+            plot_window = _make_bounds_window(parsed_a, parsed_b, margin_ratio=0.15, min_margin=0.5)
+        elif "x_data" in kwargs and kwargs["x_data"]:
+            xs = kwargs["x_data"]
+            min_x = min(xs)
+            max_x = max(xs)
+            span = max(max_x - min_x, 1e-9)
+            margin = max(span * 0.1, 0.2)
+            plot_window = {"x_min": min_x - margin, "x_max": max_x + margin}
+        elif parsed_a is not None and parsed_b is not None:
+            plot_window = _make_bounds_window(parsed_a, parsed_b, margin_ratio=0.15, min_margin=0.5)
+        else:
+            center_val = None
+            if root is not None and math.isfinite(root):
+                center_val = root
+            elif parsed_x0 is not None and math.isfinite(parsed_x0):
+                center_val = parsed_x0
+            if center_val is not None:
+                plot_window = _make_center_window(center_val, half_width=10.0)
+
         # Preformatear mensaje conservando saltos de linea
         message = message.replace('\n', '\n')
 
@@ -736,6 +775,9 @@ def solve(req: SolveRequest):
             "nodes": nodes,
             "root": {"x": root, "y": root_y} if root is not None else None,
             "is_fx": is_fx,
+            "plot_window": plot_window,
+            "integration_window": integration_window,
+            "is_newton_cotes": is_newton_cotes,
         }
 
     except Exception as exc:

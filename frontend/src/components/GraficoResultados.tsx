@@ -24,6 +24,11 @@ interface RootData {
   y: number;
 }
 
+interface PlotWindow {
+  x_min: number;
+  x_max: number;
+}
+
 interface GraficoProps {
   plotData: PlotData | null;
   plotSecondaryData?: PlotData | null;
@@ -31,9 +36,24 @@ interface GraficoProps {
   nodesData?: RootData[] | null;
   rootData: RootData | null;
   isFx: boolean;
+  plotWindow?: PlotWindow | null;
+  integrationWindow?: PlotWindow | null;
+  plotViewMode?: 'auto' | 'full';
+  isNewtonCotes?: boolean;
 }
 
-export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecondaryData, plotBasesData, nodesData, rootData, isFx }) => {
+export const GraficoResultados: React.FC<GraficoProps> = ({
+  plotData,
+  plotSecondaryData,
+  plotBasesData,
+  nodesData,
+  rootData,
+  isFx,
+  plotWindow,
+  integrationWindow,
+  plotViewMode = 'auto',
+  isNewtonCotes = false,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,7 +61,50 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
 
     const traces: any[] = [];
 
+    const normalizeWindow = (window?: PlotWindow | null) => {
+      if (!window) return null;
+      const min = Math.min(window.x_min, window.x_max);
+      const max = Math.max(window.x_min, window.x_max);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return null;
+      return { x_min: min, x_max: max };
+    };
+
+    const resolvedPlotWindow = normalizeWindow(plotWindow);
+    const resolvedIntegrationWindow = normalizeWindow(integrationWindow);
+
     if (plotData) {
+      const canShadeArea = isNewtonCotes && isFx && resolvedIntegrationWindow;
+      if (canShadeArea) {
+        const areaX: number[] = [];
+        const areaY: number[] = [];
+        const minAreaX = resolvedIntegrationWindow!.x_min;
+        const maxAreaX = resolvedIntegrationWindow!.x_max;
+        const points = Math.min(plotData.x.length, plotData.y.length);
+        for (let i = 0; i < points; i++) {
+          const xVal = plotData.x[i];
+          const yVal = plotData.y[i];
+          if (!Number.isFinite(xVal) || !Number.isFinite(yVal)) continue;
+          if (xVal >= minAreaX && xVal <= maxAreaX) {
+            areaX.push(xVal);
+            areaY.push(yVal);
+          }
+        }
+
+        if (areaX.length > 1) {
+          traces.push({
+            x: areaX,
+            y: areaY,
+            mode: 'lines',
+            name: 'Area [a,b]',
+            fill: 'tozeroy',
+            fillcolor: 'rgba(34, 211, 238, 0.18)',
+            line: { color: 'rgba(34, 211, 238, 0.35)', width: 1 },
+            hoverinfo: 'skip',
+            showlegend: false,
+          });
+        }
+      }
+
       traces.push({
         x: plotData.x, 
         y: plotData.y,
@@ -130,29 +193,34 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
 
     let xMin = -5, xMax = 5;
 
-    // Prefer node-driven range for interpolation methods.
-    if (nodesData && nodesData.length > 1) {
-       const xs = nodesData.map(n => n.x).filter(Number.isFinite);
-       const minNodeX = Math.min(...xs);
-       const maxNodeX = Math.max(...xs);
-       const span = Math.max(maxNodeX - minNodeX, 1);
-       xMin = minNodeX - (span * 0.2); // Add 20% margin
-       xMax = maxNodeX + (span * 0.2);
-    } else if (activePlots.length > 0) {
-       const xs = collectFiniteX(activePlots);
-       if (xs.length > 0) {
-         const minX = Math.min(...xs);
-         const maxX = Math.max(...xs);
-         const width = Math.max(maxX - minX, 10);
-         const margin = width * 0.05;
-         const center = (minX + maxX) / 2;
-         xMin = center - (width / 2) - margin;
-         xMax = center + (width / 2) + margin;
-       }
-    } else if (rootData && Number.isFinite(rootData.x)) {
-       xMin = rootData.x - 5;
-       xMax = rootData.x + 5;
-    }
+     if (plotViewMode === 'auto' && resolvedPlotWindow) {
+      xMin = resolvedPlotWindow.x_min;
+      xMax = resolvedPlotWindow.x_max;
+     } else {
+      // Prefer node-driven range for interpolation methods.
+      if (nodesData && nodesData.length > 1) {
+        const xs = nodesData.map(n => n.x).filter(Number.isFinite);
+        const minNodeX = Math.min(...xs);
+        const maxNodeX = Math.max(...xs);
+        const span = Math.max(maxNodeX - minNodeX, 1);
+        xMin = minNodeX - (span * 0.2); // Add 20% margin
+        xMax = maxNodeX + (span * 0.2);
+      } else if (activePlots.length > 0) {
+        const xs = collectFiniteX(activePlots);
+        if (xs.length > 0) {
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const width = Math.max(maxX - minX, 10);
+          const margin = width * 0.05;
+          const center = (minX + maxX) / 2;
+          xMin = center - (width / 2) - margin;
+          xMax = center + (width / 2) + margin;
+        }
+      } else if (rootData && Number.isFinite(rootData.x)) {
+        xMin = rootData.x - 5;
+        xMax = rootData.x + 5;
+      }
+     }
 
     const collectYBounds = (plots: Array<{ x: number[]; y: number[] }>) => {
       let min = Infinity;
@@ -186,6 +254,11 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
     }
     
     if (yMin === Infinity) { yMin = -10; yMax = 10; }
+
+    if (isNewtonCotes) {
+      yMin = Math.min(yMin, 0);
+      yMax = Math.max(yMax, 0);
+    }
     
     // Increase Y padding to fit nodes perfectly
     let yPadding = Math.max(0.5, (yMax - yMin) * 0.2);
@@ -228,7 +301,7 @@ export const GraficoResultados: React.FC<GraficoProps> = ({ plotData, plotSecond
       modeBarButtonsToRemove: ['lasso2d', 'select2d'],
     });
 
-  }, [plotData, plotSecondaryData, plotBasesData, nodesData, rootData, isFx]);
+  }, [plotData, plotSecondaryData, plotBasesData, nodesData, rootData, isFx, plotWindow, integrationWindow, plotViewMode, isNewtonCotes]);
 
   return <div ref={containerRef} className="plot-container" style={{ minHeight: '400px' }} />;
 };

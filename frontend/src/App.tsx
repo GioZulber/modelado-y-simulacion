@@ -145,6 +145,8 @@ function App() {
     showBases: false
   });
 
+  const [plotViewMode, setPlotViewMode] = useState<'auto' | 'full'>('auto');
+
   const inputFxRef = useRef<HTMLInputElement>(null);
   const inputGxRef = useRef<HTMLInputElement>(null);
   const inputXdataRef = useRef<HTMLInputElement>(null);
@@ -760,6 +762,27 @@ function App() {
                         </label>
                       )}
                     </div>
+                    <div style={{ marginTop: '12px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-math)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Escala</span>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          name="plotViewMode"
+                          checked={plotViewMode === 'auto'}
+                          onChange={() => setPlotViewMode('auto')}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontFamily: 'var(--font-math)' }}>Auto (zoom)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          name="plotViewMode"
+                          checked={plotViewMode === 'full'}
+                          onChange={() => setPlotViewMode('full')}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontFamily: 'var(--font-math)' }}>Span completo</span>
+                      </label>
+                    </div>
                   </div>
                 )}
               </section>
@@ -773,7 +796,11 @@ function App() {
                     plotBasesData={plotOptions.showBases ? results.plot_bases : null}
                     nodesData={results.nodes} 
                     rootData={results.root} 
-                    isFx={results.is_fx} 
+                    isFx={results.is_fx}
+                    plotWindow={results.plot_window}
+                    integrationWindow={results.integration_window}
+                    plotViewMode={plotViewMode}
+                    isNewtonCotes={results.is_newton_cotes}
                   />
                 </section>
               )}
