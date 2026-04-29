@@ -285,7 +285,7 @@ MARCOS_TEORICOS = {
             },
             {
                 "etiqueta": "Error de truncamiento en un punto",
-                "latex": r"E_T(\xi)=-\frac{(b-a)h^2}{12}f''(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^2}{12}f''(e)",
+                "latex": r"E_T(\xi)=-\frac{(b-a)^3}{12n^2}f''(\xi)\qquad",
                 "detalle": "La forma compuesta acumula el efecto de todos los subintervalos.",
             },
         ],
@@ -380,7 +380,7 @@ MARCOS_TEORICOS = {
             },
             {
                 "etiqueta": "Error de truncamiento en un punto",
-                "latex": r"E_T(\xi)=-\frac{(b-a)h^4}{180}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^4}{180}f^{(4)}(e)",
+                "latex": r"E_T(\xi)=-\frac{(b-a)^5}{180 n^4}f^{(4)}(\xi)",
                 "detalle": "En la regla compuesta el error baja con h^4.",
             },
         ],
@@ -444,7 +444,7 @@ MARCOS_TEORICOS = {
             },
             {
                 "etiqueta": "Error de truncamiento en un punto",
-                "latex": r"E_T(\xi)=-\frac{(b-a)h^4}{80}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^4}{80}f^{(4)}(e)",
+                "latex": r"E = - \frac{(b-a)^5}{6480} f^4(\xi)",
                 "detalle": "La expresion usa la cuarta derivada evaluada en un punto representativo.",
             },
         ],
