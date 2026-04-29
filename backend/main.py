@@ -721,6 +721,41 @@ def _parse_linear_ode_equation(
     return p_expr, q_expr, standard_latex
 
 
+def _parse_first_order_derivative_equation(
+    equation_text: str,
+    x_name: str,
+    y_name: str,
+) -> tuple[sp.Expr, str]:
+    normalized = _normalize_ode_equation_text(equation_text, x_name, y_name)
+    if not normalized:
+        raise ValueError("Ingresa la ecuacion diferencial.")
+
+    if "=" in normalized:
+        left_text, right_text = normalized.split("=", 1)
+    else:
+        left_text, right_text = "D", normalized
+
+    variables = [x_name, y_name, "D"]
+    x = sp.Symbol(x_name)
+    y = sp.Symbol(y_name)
+    derivative = sp.Symbol("D")
+    left_expr = _parse_symbolic_expression(left_text, variables)
+    right_expr = _parse_symbolic_expression(right_text, variables)
+    equation_expr = sp.expand(left_expr - right_expr)
+    derivative_coeff = sp.simplify(equation_expr.coeff(derivative))
+
+    if derivative_coeff == 0:
+        raise ValueError("No se encontro dy/dx ni y' en la ecuacion.")
+
+    rest = sp.simplify((equation_expr - derivative_coeff * derivative) / derivative_coeff)
+    if derivative in rest.free_symbols:
+        raise ValueError("La ecuacion debe ser de primer orden y despejable en y'.")
+
+    rhs = sp.simplify(-rest)
+    derivative_latex = rf"\frac{{d{sp.latex(y)}}}{{d{sp.latex(x)}}}"
+    return rhs, rf"{derivative_latex} = {sp.latex(rhs)}"
+
+
 def _parse_initial_condition_text(
     condition_text: Optional[str],
     x_name: str,
@@ -971,6 +1006,143 @@ def _linear_ode_solution(
             "integrating_factor_latex": sp.latex(integrating_factor),
             "implicit_latex": None,
             "exactness_latex": None,
+            "interval": interval_info,
+        },
+    }
+
+
+def _separable_ode_solution(
+    rhs_expr: sp.Expr,
+    equation_latex: str,
+    x: sp.Symbol,
+    y: sp.Symbol,
+    x0: Optional[sp.Expr],
+    y0: Optional[sp.Expr],
+    interval_info: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    separated = sp.separatevars(rhs_expr, symbols=[x, y], dict=True, force=True)
+    if not separated:
+        raise ValueError("No se pudo separar como f(x) g(y).")
+
+    coeff = sp.simplify(separated.get("coeff", sp.Integer(1)))
+    x_factor = sp.simplify(coeff * separated.get(x, sp.Integer(1)))
+    y_factor = sp.simplify(separated.get(y, sp.Integer(1)))
+
+    if x in y_factor.free_symbols or y in x_factor.free_symbols:
+        raise ValueError("La ecuacion no quedo separada en una parte de x y otra de y.")
+    if sp.simplify(y_factor) == 0:
+        raise ValueError("La parte dependiente de y no puede ser cero para separar variables.")
+
+    left_integrand = sp.simplify(1 / y_factor)
+    left_integral = sp.simplify(sp.integrate(left_integrand, y))
+    right_integral = sp.simplify(sp.integrate(x_factor, x))
+    if left_integral.has(sp.Integral) or right_integral.has(sp.Integral):
+        raise ValueError("No se pudieron resolver simbolicamente las integrales de la separacion.")
+
+    c = sp.Symbol("C")
+    implicit_general = sp.Eq(left_integral, right_integral + c)
+    implicit_general_latex = rf"{sp.latex(left_integral)} = {sp.latex(right_integral)} + C"
+    general_solutions = _solve_potential_for_y(left_integral - right_integral, c, x, y)
+    general_latex = _format_ode_solution_latex(general_solutions, y, x)
+    general_plain = _format_ode_solution_plain(general_solutions, y, x)
+
+    steps = [
+        _step(
+            "EDO separable",
+            "Se interpreta la ecuacion como y' = f(x) g(y).",
+            equation_latex,
+        ),
+        _step(
+            "Separacion",
+            "Se identifican los factores que dependen solo de x y solo de y.",
+            rf"\frac{{d{sp.latex(y)}}}{{d{sp.latex(x)}}} = \left({sp.latex(x_factor)}\right)\left({sp.latex(y_factor)}\right)",
+        ),
+        _step(
+            "Variables separadas",
+            "Se pasa la parte de y al lado izquierdo y la parte de x al derecho.",
+            rf"\frac{{1}}{{{sp.latex(y_factor)}}}\,d{sp.latex(y)} = {sp.latex(x_factor)}\,d{sp.latex(x)}",
+        ),
+        _step(
+            "Integracion",
+            "Se integran ambos lados.",
+            rf"\int {sp.latex(left_integrand)}\,d{sp.latex(y)} = \int {sp.latex(x_factor)}\,d{sp.latex(x)} + C",
+        ),
+        _step(
+            "Solucion implicita general",
+            "La constante de integracion queda del lado derecho.",
+            implicit_general_latex,
+        ),
+    ]
+
+    c_value = None
+    particular_solutions: List[sp.Expr] = []
+    particular_latex = None
+    particular_plain = None
+    implicit_latex = implicit_general_latex
+    display_latex = general_latex or implicit_general_latex
+    result_latex = display_latex
+    result_plain = general_plain or f"{_format_plain(left_integral)} = {_format_plain(right_integral)} + C"
+    message = f"Solucion general: {result_plain}"
+
+    if x0 is not None and y0 is not None:
+        c_value = sp.simplify(left_integral.subs(y, y0) - right_integral.subs(x, x0))
+        implicit_latex = rf"{sp.latex(left_integral)} = {sp.latex(right_integral)} + {sp.latex(c_value)}"
+        particular_solutions = _solve_potential_for_y(
+            left_integral - right_integral,
+            c_value,
+            x,
+            y,
+            x0,
+            y0,
+        )
+        particular_latex = _format_ode_solution_latex(particular_solutions, y, x)
+        particular_plain = _format_ode_solution_plain(particular_solutions, y, x)
+        display_latex = particular_latex or implicit_latex
+        result_latex = display_latex
+        result_plain = particular_plain or f"{_format_plain(left_integral)} = {_format_plain(right_integral + c_value)}"
+        message = f"C = {_format_plain(c_value)}\nSolucion: {result_plain}"
+        steps.append(
+            _step(
+                "Condicion inicial",
+                "Se reemplaza el punto inicial para calcular la constante C.",
+                rf"C = {sp.latex(left_integral.subs(y, y0))} - {sp.latex(right_integral.subs(x, x0))} = {sp.latex(c_value)}",
+            )
+        )
+        steps.append(
+            _step(
+                "Solucion con C calculada",
+                "Se reemplaza C y, si es posible, se despeja y(x).",
+                display_latex,
+            )
+        )
+
+    return {
+        "steps": steps,
+        "display_latex": display_latex,
+        "result": result_plain,
+        "result_latex": result_latex,
+        "message": message,
+        "ode_solution": {
+            "mode": "separable",
+            "equation_latex": equation_latex,
+            "general": general_plain or f"{_format_plain(left_integral)} = {_format_plain(right_integral)} + C",
+            "general_latex": general_latex or implicit_general_latex,
+            "particular": particular_plain,
+            "particular_latex": particular_latex,
+            "constant_value": _format_plain(c_value) if c_value is not None else None,
+            "constant_latex": sp.latex(c_value) if c_value is not None else None,
+            "initial_point_latex": (
+                rf"\left({sp.latex(x0)}, {sp.latex(y0)}\right)"
+                if x0 is not None and y0 is not None
+                else None
+            ),
+            "integrating_factor_latex": None,
+            "implicit_latex": implicit_latex,
+            "exactness_latex": None,
+            "x_factor": _format_plain(x_factor),
+            "x_factor_latex": sp.latex(x_factor),
+            "y_factor": _format_plain(y_factor),
+            "y_factor_latex": sp.latex(y_factor),
             "interval": interval_info,
         },
     }
@@ -1433,7 +1605,32 @@ def calculate_symbolic(req: CalculusRequest):
             response_variables = [variable, dependent_variable]
             ode_mode = req.ode_mode.strip().lower() if req.ode_mode else "linear"
 
-            if ode_mode in ("equation", "ecuacion", "direct", "directa"):
+            if ode_mode in ("separable", "separables", "variables_separables"):
+                equation_text = _required_expression(req.ode_equation or expression_text, "la ecuacion diferencial")
+                rhs_expr, standard_latex = _parse_first_order_derivative_equation(
+                    equation_text,
+                    variable,
+                    dependent_variable,
+                )
+                if req.initial_condition and str(req.initial_condition).strip():
+                    x0, y0 = _parse_initial_condition_text(req.initial_condition, variable, dependent_variable)
+                else:
+                    x0, y0 = _parse_initial_pair(req.initial_x, req.initial_y, variable, dependent_variable, [variable, dependent_variable])
+                interval_info = _parse_interval_expression(req.interval_expression, variable)
+
+                solution_data = _separable_ode_solution(rhs_expr, standard_latex, x, y, x0, y0, interval_info)
+                steps = solution_data["steps"]
+                display_latex = solution_data["display_latex"]
+                result_plain = solution_data["result"]
+                result_latex = solution_data["result_latex"]
+                message = solution_data["message"]
+                ode_solution = solution_data["ode_solution"]
+                operation_label = "EDO separable"
+                expr = rhs_expr
+                response_expression_latex = ode_solution["equation_latex"]
+                response_expression_plain = f"d{dependent_variable}/d{variable} = {_format_plain(rhs_expr)}"
+                response_definite = False
+            elif ode_mode in ("equation", "ecuacion", "direct", "directa"):
                 equation_text = _required_expression(req.ode_equation or expression_text, "la ecuacion diferencial")
                 p_expr, q_expr, standard_latex = _parse_linear_ode_equation(equation_text, variable, dependent_variable)
                 if req.initial_condition and str(req.initial_condition).strip():
@@ -1524,7 +1721,7 @@ def calculate_symbolic(req: CalculusRequest):
                 )
                 response_definite = False
             else:
-                raise ValueError("Modo de EDO no reconocido. Usa lineal o exacta.")
+                raise ValueError("Modo de EDO no reconocido. Usa lineal, separable o exacta.")
         else:
             raise ValueError("Operacion no reconocida. Usa 'derivar', 'integrar' o 'edo'.")
 

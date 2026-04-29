@@ -5,6 +5,7 @@ import { RenderLatex } from './RenderLatex';
 
 type CalculusOperation = 'derivar' | 'integrar' | 'edo';
 type IntegralMode = 'simple' | 'double';
+type OdeMethod = 'linear' | 'separable';
 type MathInputField = 'expression' | 'odeEquation';
 
 interface CalculusStep {
@@ -28,7 +29,7 @@ interface DerivativeEvaluation {
 }
 
 interface OdeSolution {
-  mode: 'linear' | 'exact';
+  mode: 'linear' | 'separable' | 'exact';
   equation_latex: string;
   general: string;
   general_latex: string;
@@ -44,6 +45,10 @@ interface OdeSolution {
   p_latex?: string;
   q?: string;
   q_latex?: string;
+  x_factor?: string;
+  x_factor_latex?: string;
+  y_factor?: string;
+  y_factor_latex?: string;
   interval?: {
     lower: string;
     upper: string;
@@ -89,6 +94,7 @@ interface CalculusForm {
   order: string;
   definite: boolean;
   integralMode: IntegralMode;
+  odeMethod: OdeMethod;
   a: string;
   b: string;
   eval_at: string;
@@ -116,6 +122,7 @@ export const CalculadoraCalculo: React.FC = () => {
     order: '1',
     definite: false,
     integralMode: 'simple',
+    odeMethod: 'linear',
     a: '0',
     b: '1',
     eval_at: '',
@@ -224,7 +231,7 @@ export const CalculadoraCalculo: React.FC = () => {
         order: Math.max(1, parseInt(form.order, 10) || 1),
         definite: form.operation === 'integrar' ? (isDoubleIntegral ? true : form.definite) : false,
         integral_mode: form.operation === 'integrar' ? form.integralMode : 'simple',
-        ode_mode: form.operation === 'edo' ? 'equation' : undefined,
+        ode_mode: form.operation === 'edo' ? (form.odeMethod === 'separable' ? 'separable' : 'equation') : undefined,
         ode_equation: form.operation === 'edo' ? form.odeEquation : undefined,
         initial_condition: form.operation === 'edo' && form.initialCondition.trim() ? form.initialCondition : undefined,
         interval_expression: form.operation === 'edo' && form.intervalExpression.trim() ? form.intervalExpression : undefined,
@@ -337,7 +344,7 @@ export const CalculadoraCalculo: React.FC = () => {
                 <div className="form-group full-width">
                   <label htmlFor="ode-equation">
                     Ecuación diferencial
-                    <span className="field-hint">Acepta dy/dx = f(x) o y' + P(x)y = Q(x)</span>
+                    <span className="field-hint">Acepta dy/dx = f(x,y) o y' + P(x)y = Q(x)</span>
                   </label>
                   <input
                     id="ode-equation"
@@ -348,6 +355,17 @@ export const CalculadoraCalculo: React.FC = () => {
                     autoComplete="off"
                     onChange={event => updateForm('odeEquation', event.target.value)}
                   />
+                </div>
+                <div className="form-group full-width">
+                  <label htmlFor="ode-method">Método</label>
+                  <select
+                    id="ode-method"
+                    value={form.odeMethod}
+                    onChange={event => updateForm('odeMethod', event.target.value as OdeMethod)}
+                  >
+                    <option value="linear">Lineal</option>
+                    <option value="separable">Variables separables</option>
+                  </select>
                 </div>
                 <div className="form-grid half full-width">
                   <div className="form-group">
@@ -579,6 +597,9 @@ export const CalculadoraCalculo: React.FC = () => {
                   {result.ode_solution.p_latex !== undefined && result.ode_solution.q_latex !== undefined && (
                     <RenderLatex math={`P(x) = ${result.ode_solution.p_latex},\\quad Q(x) = ${result.ode_solution.q_latex}`} />
                   )}
+                  {result.ode_solution.x_factor_latex !== undefined && result.ode_solution.y_factor_latex !== undefined && (
+                    <RenderLatex math={`f(x) = ${result.ode_solution.x_factor_latex},\\quad g(y) = ${result.ode_solution.y_factor_latex}`} />
+                  )}
                   {result.ode_solution.interval?.interval_latex && (
                     <RenderLatex math={result.ode_solution.interval.interval_latex} />
                   )}
@@ -591,7 +612,7 @@ export const CalculadoraCalculo: React.FC = () => {
                   {result.ode_solution.constant_latex && (
                     <RenderLatex math={`C = ${result.ode_solution.constant_latex}`} />
                   )}
-                  {result.ode_solution.implicit_latex && result.ode_solution.mode === 'exact' && (
+                  {result.ode_solution.implicit_latex && result.ode_solution.mode !== 'linear' && (
                     <RenderLatex math={result.ode_solution.implicit_latex} />
                   )}
                 </div>
