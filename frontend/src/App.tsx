@@ -123,13 +123,16 @@ function App() {
     a: '1',
     b: '2',
     x0: '1',
+    y0: '0.5',
+    h: '0.2',
     n: '6',
+    exact_expr: '',
     max_iter: '100',
     tol: '1e-6',
     precision: '8'
   });
 
-  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr' | 'x_data' | 'y_data'>('f_expr');
+  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr' | 'x_data' | 'y_data' | 'exact_expr'>('f_expr');
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
@@ -146,6 +149,7 @@ function App() {
   const inputGxRef = useRef<HTMLInputElement>(null);
   const inputXdataRef = useRef<HTMLInputElement>(null);
   const inputYdataRef = useRef<HTMLInputElement>(null);
+  const inputExactRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get('/api/methods')
@@ -210,7 +214,8 @@ function App() {
       f_expr: inputFxRef,
       g_expr: inputGxRef,
       x_data: inputXdataRef,
-      y_data: inputYdataRef
+      y_data: inputYdataRef,
+      exact_expr: inputExactRef
     };
     
     const inputRef = refs[activeInput]?.current;
@@ -269,6 +274,7 @@ function App() {
   const getTargetLabel = () => {
     if (activeInput === 'x_data') return 'x_data';
     if (activeInput === 'y_data') return 'y_data';
+    if (activeInput === 'exact_expr') return 'y exacta';
     
     const hasF = requires.includes('f_expr') || opcionales.includes('f_expr');
     const hasG = requires.includes('g_expr') || opcionales.includes('g_expr');
@@ -287,11 +293,16 @@ function App() {
 
   const isVisible = (field: string) => requires.includes(field) || opcionales.includes(field);
   const isAnyPlotActive = plotOptions.showFx || plotOptions.showPx || plotOptions.showBases;
-  const functionSignature = isVisible('variables') ? `f(${inputs.variables.trim() || 'x'})` : 'f(x)';
-  const nFieldLabel = selectedMethod === 'monte_carlo_integral' ? 'n (Muestras)' : 'n (Subintervalos)';
+  const isOdeMethod = isVisible('y0') || isVisible('h') || isVisible('exact_expr');
+  const functionSignature = isOdeMethod
+    ? 'f(x, y)'
+    : isVisible('variables') ? `f(${inputs.variables.trim() || 'x'})` : 'f(x)';
+  const nFieldLabel = selectedMethod === 'monte_carlo_integral'
+    ? 'n (Muestras)'
+    : isOdeMethod ? 'n (Pasos)' : 'n (Subintervalos)';
   const nFieldHint = selectedMethod === 'monte_carlo_integral'
     ? 'Cantidad de puntos aleatorios. Mas muestras reducen el error como 1/sqrt(n).'
-    : 'Par para Simpson 1/3 compuesta y múltiplo de 3 para Simpson 3/8 compuesta';
+    : isOdeMethod ? 'Cantidad de avances desde la condicion inicial' : 'Par para Simpson 1/3 compuesta y múltiplo de 3 para Simpson 3/8 compuesta';
 
   return (
     <div className="app-container">
@@ -350,6 +361,17 @@ function App() {
                         confidence_level: prev.confidence_level || '95',
                       }));
                     }
+                    if (nextMethod === 'euler_edo' || nextMethod === 'rk4_edo') {
+                      setInputs(prev => ({
+                        ...prev,
+                        f_expr: prev.f_expr || 'y - x^2 + 1',
+                        x0: prev.x0 === '1' ? '0' : prev.x0,
+                        y0: prev.y0 || '0.5',
+                        h: prev.h || '0.2',
+                        n: prev.n === '6' ? '5' : prev.n,
+                        exact_expr: prev.exact_expr || '(x + 1)^2 - 0.5*exp(x)',
+                      }));
+                    }
                   }}
                 >
                   {Object.keys(methodGroups).length === 0 && <option value="">Cargando métodos…</option>}
@@ -389,6 +411,24 @@ function App() {
                   value={inputs.f_expr}
                   onChange={handleInputChange}
                   onFocus={() => setActiveInput('f_expr')}
+                />
+              </div>
+
+              <div className={`form-group full-width ${!isVisible('exact_expr') ? 'hidden' : ''}`}>
+                <label htmlFor="input-exact">
+                  y exacta
+                  <span className="field-hint">Opcional. Si la ingresas, se calcula el error absoluto en cada paso</span>
+                </label>
+                <input
+                  type="text"
+                  name="exact_expr"
+                  id="input-exact"
+                  ref={inputExactRef}
+                  placeholder="ej: (x + 1)^2 - 0.5*exp(x)"
+                  autoComplete="off"
+                  value={inputs.exact_expr}
+                  onChange={handleInputChange}
+                  onFocus={() => setActiveInput('exact_expr')}
                 />
               </div>
 
@@ -510,6 +550,22 @@ function App() {
                   {opcionales.includes('x0') && <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Opcional. También acepta `pi` o `pi/4`</span>}
                 </label>
                 <input type="text" name="x0" id="input-x0" value={inputs.x0} onChange={handleInputChange} />
+              </div>
+
+              <div className={`form-group ${!isVisible('y0') ? 'hidden' : ''}`}>
+                <label htmlFor="input-y0">
+                  y₀ (Condicion inicial)
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Valor de y en x0</span>
+                </label>
+                <input type="text" name="y0" id="input-y0" value={inputs.y0} onChange={handleInputChange} />
+              </div>
+
+              <div className={`form-group ${!isVisible('h') ? 'hidden' : ''}`}>
+                <label htmlFor="input-h">
+                  h (Paso)
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Acepta expresiones como `0.2`, `1/5` o `pi/10`</span>
+                </label>
+                <input type="text" name="h" id="input-h" value={inputs.h} onChange={handleInputChange} />
               </div>
 
               <div className={`form-group ${!isVisible('n') ? 'hidden' : ''}`}>

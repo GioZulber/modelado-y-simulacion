@@ -449,4 +449,81 @@ MARCOS_TEORICOS = {
             "Aumentar n reduce el error esperado, aunque la convergencia es lenta: orden 1/sqrt(n).",
         ],
     },
+    "euler_edo": {
+        "titulo": "Metodo de Euler para Ecuaciones Diferenciales",
+        "resumen": "Aproxima la solucion de una ecuacion diferencial ordinaria de primer orden y' = f(x,y) avanzando con la pendiente al inicio de cada paso.",
+        "formulas": [
+            {
+                "etiqueta": "Ecuacion diferencial",
+                "latex": r"y'=f(x,y),\quad y(x_0)=y_0",
+                "detalle": "El metodo parte de una condicion inicial conocida.",
+            },
+            {
+                "etiqueta": "Paso en x",
+                "latex": r"x_{n+1}=x_n+h",
+                "detalle": "h es el tamano de paso.",
+            },
+            {
+                "etiqueta": "Actualizacion de Euler",
+                "latex": r"y_{n+1}=y_n+h\,f(x_n,y_n)",
+                "detalle": "Usa la pendiente inicial del intervalo para avanzar una recta tangente.",
+            },
+            {
+                "etiqueta": "Error absoluto",
+                "latex": r"E_n=\left|y_{\text{exacta}}(x_n)-y_n\right|",
+                "detalle": "Solo se calcula si se ingresa la solucion exacta.",
+            },
+        ],
+        "pasos": [
+            "Ingresar f(x,y), x0, y0, h y n.",
+            "Evaluar la pendiente f(xn,yn).",
+            "Calcular yn+1 = yn + h f(xn,yn).",
+            "Avanzar x al siguiente punto y repetir n pasos.",
+            "Si hay solucion exacta, comparar el valor aproximado contra y exacta.",
+        ],
+        "condiciones": [
+            "La funcion f debe poder evaluarse en los puntos generados.",
+            "h no puede ser cero y n debe ser mayor o igual a 1.",
+            "Euler es simple pero de bajo orden; errores grandes pueden aparecer si h es demasiado grande.",
+        ],
+    },
+    "rk4_edo": {
+        "titulo": "Runge-Kutta de Orden 4 para Ecuaciones Diferenciales",
+        "resumen": "Aproxima la solucion de y' = f(x,y) combinando cuatro pendientes por paso para lograr mayor precision que Euler.",
+        "formulas": [
+            {
+                "etiqueta": "Pendientes ponderadas",
+                "latex": r"\begin{aligned} k_1&=h f(x_n,y_n)\\ k_2&=h f(x_n+\frac{h}{2},y_n+\frac{k_1}{2})\\ k_3&=h f(x_n+\frac{h}{2},y_n+\frac{k_2}{2})\\ k_4&=h f(x_n+h,y_n+k_3) \end{aligned}",
+                "detalle": "Cada k ya incluye el factor h.",
+            },
+            {
+                "etiqueta": "Actualizacion RK4",
+                "latex": r"y_{n+1}=y_n+\frac{k_1+2k_2+2k_3+k_4}{6}",
+                "detalle": "Promedia las pendientes con mayor peso para las estimaciones intermedias.",
+            },
+            {
+                "etiqueta": "Paso en x",
+                "latex": r"x_{n+1}=x_n+h",
+                "detalle": "Se avanza la variable independiente con paso constante.",
+            },
+            {
+                "etiqueta": "Error absoluto",
+                "latex": r"E_n=\left|y_{\text{exacta}}(x_n)-y_n\right|",
+                "detalle": "Solo se calcula si se ingresa la solucion exacta.",
+            },
+        ],
+        "pasos": [
+            "Ingresar f(x,y), x0, y0, h y n.",
+            "Calcular k1 con la pendiente al inicio del intervalo.",
+            "Calcular k2 y k3 usando puntos intermedios.",
+            "Calcular k4 usando el extremo del intervalo.",
+            "Actualizar y con el promedio ponderado y repetir n pasos.",
+            "Si hay solucion exacta, comparar el valor aproximado contra y exacta.",
+        ],
+        "condiciones": [
+            "La funcion f debe poder evaluarse en todos los puntos intermedios.",
+            "h no puede ser cero y n debe ser mayor o igual a 1.",
+            "RK4 suele ser mucho mas preciso que Euler para el mismo h, pero evalua f cuatro veces por paso.",
+        ],
+    },
 }

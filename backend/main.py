@@ -41,7 +41,10 @@ class SolveRequest(BaseModel):
     a: Optional[str] = None
     b: Optional[str] = None
     x0: Optional[str] = None
+    y0: Optional[str] = None
+    h: Optional[str] = None
     n: Optional[str] = None
+    exact_expr: Optional[str] = ""
     max_iter: int = 100
     tol: float = 1e-6
     precision: int = 8
@@ -492,6 +495,8 @@ def solve(req: SolveRequest):
         parsed_a = parse_scalar_value(req.a, "a")
         parsed_b = parse_scalar_value(req.b, "b")
         parsed_x0 = parse_scalar_value(req.x0, "x0")
+        parsed_y0 = parse_scalar_value(req.y0, "y0")
+        parsed_h = parse_scalar_value(req.h, "h")
 
         if "x_data" in requiere or "x_data" in opcionales:
             if req.x_data:
@@ -507,6 +512,15 @@ def solve(req: SolveRequest):
             kwargs["seed"] = req.seed
         if "confidence_level" in requiere or "confidence_level" in opcionales:
             kwargs["confidence_level"] = req.confidence_level
+        if "y0" in requiere or "y0" in opcionales:
+            if parsed_y0 is not None:
+                kwargs["y0"] = parsed_y0
+        if "h" in requiere or "h" in opcionales:
+            if parsed_h is not None:
+                kwargs["h"] = parsed_h
+        if "exact_expr" in requiere or "exact_expr" in opcionales:
+            if req.exact_expr:
+                kwargs["exact_expr_str"] = req.exact_expr
         if "n" in requiere or "n" in opcionales:
             if req.n is not None:
                 try:
