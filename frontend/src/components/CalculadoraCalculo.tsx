@@ -3,8 +3,9 @@ import api from '../api';
 import { CalculadoraCientifica } from './CalculadoraCientifica';
 import { RenderLatex } from './RenderLatex';
 
-type CalculusOperation = 'derivar' | 'integrar';
+type CalculusOperation = 'derivar' | 'integrar' | 'edo';
 type IntegralMode = 'simple' | 'double';
+type MathInputField = 'expression' | 'odeEquation';
 
 interface CalculusStep {
   title: string;
@@ -26,6 +27,33 @@ interface DerivativeEvaluation {
   approximate: number | null;
 }
 
+interface OdeSolution {
+  mode: 'linear' | 'exact';
+  equation_latex: string;
+  general: string;
+  general_latex: string;
+  particular: string | null;
+  particular_latex: string | null;
+  constant_value: string | null;
+  constant_latex: string | null;
+  initial_point_latex: string | null;
+  integrating_factor_latex: string | null;
+  implicit_latex: string | null;
+  exactness_latex: string | null;
+  p?: string;
+  p_latex?: string;
+  q?: string;
+  q_latex?: string;
+  interval?: {
+    lower: string;
+    upper: string;
+    lower_latex: string;
+    upper_latex: string;
+    interval_latex: string;
+  } | null;
+  original_equation_latex?: string;
+}
+
 interface CalculusResult {
   operation: string;
   expression: string;
@@ -42,6 +70,7 @@ interface CalculusResult {
   result_latex: string;
   approximate: number | null;
   derivative_evaluation: DerivativeEvaluation | null;
+  ode_solution: OdeSolution | null;
   steps: CalculusStep[];
   message: string;
 }
@@ -56,12 +85,16 @@ interface CalculusForm {
   operation: CalculusOperation;
   expression: string;
   variable: string;
+  dependentVariable: string;
   order: string;
   definite: boolean;
   integralMode: IntegralMode;
   a: string;
   b: string;
   eval_at: string;
+  odeEquation: string;
+  initialCondition: string;
+  intervalExpression: string;
   doubleEntries: DoubleIntegralEntry[];
 }
 
@@ -79,12 +112,16 @@ export const CalculadoraCalculo: React.FC = () => {
     operation: 'derivar',
     expression: 'x**2',
     variable: 'x',
+    dependentVariable: 'y',
     order: '1',
     definite: false,
     integralMode: 'simple',
     a: '0',
     b: '1',
     eval_at: '',
+    odeEquation: 'dy/dx = cos(x) + x',
+    initialCondition: 'y(0)=1',
+    intervalExpression: '0 <= x <= pi/2',
     doubleEntries: [
       { variable: 'x', lower: '0', upper: '1' },
       { variable: 'y', lower: '0', upper: '1' },
@@ -94,6 +131,7 @@ export const CalculadoraCalculo: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CalculusResult | null>(null);
   const expressionRef = useRef<HTMLInputElement>(null);
+  const odeEquationRef = useRef<HTMLInputElement>(null);
 
   const updateForm = <K extends keyof CalculusForm>(field: K, value: CalculusForm[K]) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -112,18 +150,49 @@ export const CalculadoraCalculo: React.FC = () => {
     }));
   };
 
+  const resolveMathField = (): MathInputField => {
+    if (form.operation !== 'edo') return 'expression';
+    return 'odeEquation';
+  };
+
+  const getMathFieldValue = (field: MathInputField) => {
+    switch (field) {
+      case 'odeEquation': return form.odeEquation;
+      default: return form.expression;
+    }
+  };
+
+  const setMathFieldValue = (field: MathInputField, value: string) => {
+    switch (field) {
+      case 'odeEquation':
+        updateForm('odeEquation', value);
+        break;
+      default:
+        updateForm('expression', value);
+    }
+  };
+
+  const getMathFieldRef = (field: MathInputField) => {
+    switch (field) {
+      case 'odeEquation': return odeEquationRef;
+      default: return expressionRef;
+    }
+  };
+
   const handleInsertCode = (code: string) => {
-    const input = expressionRef.current;
+    const field = resolveMathField();
+    const value = getMathFieldValue(field);
+    const input = getMathFieldRef(field).current;
     if (!input) {
-      updateForm('expression', `${form.expression}${code}`);
+      setMathFieldValue(field, `${value}${code}`);
       return;
     }
 
-    const start = input.selectionStart ?? form.expression.length;
-    const end = input.selectionEnd ?? form.expression.length;
-    const nextExpression = form.expression.slice(0, start) + code + form.expression.slice(end);
+    const start = input.selectionStart ?? value.length;
+    const end = input.selectionEnd ?? value.length;
+    const nextExpression = value.slice(0, start) + code + value.slice(end);
 
-    updateForm('expression', nextExpression);
+    setMathFieldValue(field, nextExpression);
     setTimeout(() => {
       const nextPosition = start + code.length;
       input.setSelectionRange(nextPosition, nextPosition);
@@ -133,6 +202,13 @@ export const CalculadoraCalculo: React.FC = () => {
 
   const isDoubleIntegral = form.operation === 'integrar' && form.integralMode === 'double';
   const doubleStepLabels = ['Interna', 'Externa'];
+  const mathTargetLabel = {
+    expression: 'expresion',
+    odeEquation: 'ecuacion',
+  }[resolveMathField()];
+  const canExecute = form.operation === 'edo'
+    ? Boolean(form.odeEquation.trim())
+    : Boolean(form.expression.trim());
 
   const executeCalculus = async () => {
     setLoading(true);
@@ -142,11 +218,16 @@ export const CalculadoraCalculo: React.FC = () => {
     try {
       const res = await api.post('/api/calculus', {
         operation: form.operation,
-        expression: form.expression,
+        expression: form.operation === 'edo' ? form.odeEquation : form.expression,
         variable: form.variable || 'x',
+        dependent_variable: form.dependentVariable || 'y',
         order: Math.max(1, parseInt(form.order, 10) || 1),
         definite: form.operation === 'integrar' ? (isDoubleIntegral ? true : form.definite) : false,
         integral_mode: form.operation === 'integrar' ? form.integralMode : 'simple',
+        ode_mode: form.operation === 'edo' ? 'equation' : undefined,
+        ode_equation: form.operation === 'edo' ? form.odeEquation : undefined,
+        initial_condition: form.operation === 'edo' && form.initialCondition.trim() ? form.initialCondition : undefined,
+        interval_expression: form.operation === 'edo' && form.intervalExpression.trim() ? form.intervalExpression : undefined,
         a: form.operation === 'integrar' && form.integralMode === 'simple' && form.definite ? form.a : undefined,
         b: form.operation === 'integrar' && form.integralMode === 'simple' && form.definite ? form.b : undefined,
         eval_at: form.operation === 'derivar' && form.eval_at.trim() ? form.eval_at : undefined,
@@ -205,6 +286,13 @@ export const CalculadoraCalculo: React.FC = () => {
             >
               Integrar
             </button>
+            <button
+              type="button"
+              className={`calc-operation-btn ${form.operation === 'edo' ? 'active' : ''}`}
+              onClick={() => updateForm('operation', 'edo')}
+            >
+              EDO
+            </button>
           </div>
 
           {form.operation === 'integrar' && (
@@ -227,20 +315,74 @@ export const CalculadoraCalculo: React.FC = () => {
           )}
 
           <div className="form-grid">
-            <div className="form-group full-width">
-              <label htmlFor="calculus-expression">Expresión</label>
-              <input
-                id="calculus-expression"
-                ref={expressionRef}
-                type="text"
-                value={form.expression}
-                placeholder="ej: x**2"
-                autoComplete="off"
-                onChange={event => updateForm('expression', event.target.value)}
-              />
-            </div>
+            {form.operation !== 'edo' ? (
+              <>
+                <div className="form-group full-width">
+                  <label htmlFor="calculus-expression">Expresión</label>
+                  <input
+                    id="calculus-expression"
+                    ref={expressionRef}
+                    type="text"
+                    value={form.expression}
+                    placeholder="ej: x**2"
+                    autoComplete="off"
+                    onChange={event => updateForm('expression', event.target.value)}
+                  />
+                </div>
 
-            <CalculadoraCientifica onInsert={handleInsertCode} targetLabel="expresión" />
+                <CalculadoraCientifica onInsert={handleInsertCode} targetLabel={mathTargetLabel} />
+              </>
+            ) : (
+              <>
+                <div className="form-group full-width">
+                  <label htmlFor="ode-equation">
+                    Ecuación diferencial
+                    <span className="field-hint">Acepta dy/dx = f(x) o y' + P(x)y = Q(x)</span>
+                  </label>
+                  <input
+                    id="ode-equation"
+                    ref={odeEquationRef}
+                    type="text"
+                    value={form.odeEquation}
+                    placeholder="ej: dy/dx = cos(x) + x"
+                    autoComplete="off"
+                    onChange={event => updateForm('odeEquation', event.target.value)}
+                  />
+                </div>
+                <div className="form-grid half full-width">
+                  <div className="form-group">
+                    <label htmlFor="ode-initial-condition">
+                      Condición inicial
+                      <span className="field-hint">Para calcular C</span>
+                    </label>
+                    <input
+                      id="ode-initial-condition"
+                      type="text"
+                      value={form.initialCondition}
+                      placeholder="ej: y(0)=1"
+                      autoComplete="off"
+                      onChange={event => updateForm('initialCondition', event.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="ode-interval">
+                      Intervalo
+                      <span className="field-hint">Opcional</span>
+                    </label>
+                    <input
+                      id="ode-interval"
+                      type="text"
+                      value={form.intervalExpression}
+                      placeholder="ej: 0 <= x <= pi/2"
+                      autoComplete="off"
+                      onChange={event => updateForm('intervalExpression', event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <CalculadoraCientifica onInsert={handleInsertCode} targetLabel={mathTargetLabel} />
+              </>
+            )}
 
             {form.operation === 'derivar' ? (
               <div className="form-grid half">
@@ -268,7 +410,7 @@ export const CalculadoraCalculo: React.FC = () => {
                   />
                 </div>
               </div>
-            ) : form.integralMode === 'simple' ? (
+            ) : form.operation === 'integrar' && form.integralMode === 'simple' ? (
               <div className="form-grid half">
                 <div className="form-group">
                   <label htmlFor="calculus-variable">Variable</label>
@@ -293,7 +435,7 @@ export const CalculadoraCalculo: React.FC = () => {
                   </label>
                 </div>
               </div>
-            ) : (
+            ) : form.operation === 'integrar' ? (
               <div className="form-group full-width">
                 <label>
                   Orden de integración
@@ -337,7 +479,7 @@ export const CalculadoraCalculo: React.FC = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {form.operation === 'derivar' && (
               <div className="form-group full-width">
@@ -386,7 +528,7 @@ export const CalculadoraCalculo: React.FC = () => {
             className="btn-run"
             type="button"
             onClick={executeCalculus}
-            disabled={loading || !form.expression.trim()}
+            disabled={loading || !canExecute}
           >
             {loading && <span className="spinner" style={{ display: 'inline-block' }}></span>}
             <span>{loading ? 'Calculando...' : 'Calcular'}</span>
@@ -429,6 +571,31 @@ export const CalculadoraCalculo: React.FC = () => {
                   )}
                 </div>
               )}
+
+              {result.ode_solution && (
+                <div className="calculus-evaluation">
+                  <span className="result-highlight-label">Datos de la EDO</span>
+                  <RenderLatex math={result.ode_solution.equation_latex} />
+                  {result.ode_solution.p_latex !== undefined && result.ode_solution.q_latex !== undefined && (
+                    <RenderLatex math={`P(x) = ${result.ode_solution.p_latex},\\quad Q(x) = ${result.ode_solution.q_latex}`} />
+                  )}
+                  {result.ode_solution.interval?.interval_latex && (
+                    <RenderLatex math={result.ode_solution.interval.interval_latex} />
+                  )}
+                  {result.ode_solution.integrating_factor_latex && (
+                    <RenderLatex math={`\\mu = ${result.ode_solution.integrating_factor_latex}`} />
+                  )}
+                  {result.ode_solution.general_latex && (
+                    <RenderLatex math={result.ode_solution.general_latex} />
+                  )}
+                  {result.ode_solution.constant_latex && (
+                    <RenderLatex math={`C = ${result.ode_solution.constant_latex}`} />
+                  )}
+                  {result.ode_solution.implicit_latex && result.ode_solution.mode === 'exact' && (
+                    <RenderLatex math={result.ode_solution.implicit_latex} />
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="calculus-steps">
@@ -448,7 +615,7 @@ export const CalculadoraCalculo: React.FC = () => {
           <div className="calculus-empty">
             <div>
               <p>Esperando cálculo...</p>
-              <span>Ingresá una expresión y elegí derivar o integrar.</span>
+              <span>Ingresá una expresión y elegí derivar, integrar o resolver una EDO.</span>
             </div>
           </div>
         )}

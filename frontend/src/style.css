@@ -223,6 +223,10 @@ body::before {
   grid-template-columns: 1fr 1fr;
 }
 
+.form-grid.full-width {
+  grid-column: 1 / -1;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
