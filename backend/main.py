@@ -60,6 +60,10 @@ class CalculusRequest(BaseModel):
     a: Optional[str] = None
     b: Optional[str] = None
     eval_at: Optional[str] = None
+    integral_mode: str = "simple"
+    double_variables: List[str] = Field(default_factory=lambda: ["x", "y"])
+    double_lower_bounds: List[str] = Field(default_factory=list)
+    double_upper_bounds: List[str] = Field(default_factory=list)
 
 
 class PolynomialRequest(BaseModel):
@@ -96,14 +100,24 @@ def _nth_root(index: Any, radicand: Any) -> sp.Expr:
     return sp.Pow(radicand, sp.Integer(1) / index)
 
 
-def _parse_symbolic_expression(expr_str: str, variable: str = "x") -> sp.Expr:
-    normalized = _normalize_expression(expr_str)
-    if not re.match(r"^[A-Za-z_]\w*$", variable):
-        raise ValueError(f"Variable inválida '{variable}'")
+def _normalize_variable_names(variables: Any) -> List[str]:
+    raw_names = [variables] if isinstance(variables, str) else list(variables or ["x"])
+    normalized: List[str] = []
 
-    symbol = sp.Symbol(variable)
-    local_dict = {
-        variable: symbol,
+    for name in raw_names:
+        candidate = str(name).strip()
+        if not re.match(r"^[A-Za-z_]\w*$", candidate):
+            raise ValueError(f"Variable inválida '{candidate}'")
+        normalized.append(candidate)
+
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("Las variables de integración no pueden repetirse.")
+
+    return normalized
+
+
+def _build_symbolic_locals(variable_names: List[str]) -> Dict[str, Any]:
+    local_dict: Dict[str, Any] = {
         "E": sp.E,
         "e": sp.E,
         "pi": sp.pi,
@@ -120,6 +134,14 @@ def _parse_symbolic_expression(expr_str: str, variable: str = "x") -> sp.Expr:
         "nroot": _nth_root,
         "abs": sp.Abs,
     }
+    local_dict.update({name: sp.Symbol(name) for name in variable_names})
+    return local_dict
+
+
+def _parse_symbolic_expression(expr_str: str, variables: Any = "x") -> sp.Expr:
+    normalized = _normalize_expression(expr_str)
+    variable_names = _normalize_variable_names(variables)
+    local_dict = _build_symbolic_locals(variable_names)
     try:
         return parse_expr(normalized, transformations=_PARSER_TRANSFORMATIONS, local_dict=local_dict, evaluate=True)
     except Exception as exc:
@@ -216,6 +238,23 @@ def _d_operator(x: sp.Symbol) -> str:
 
 def _integral_operator(expr: sp.Expr, x: sp.Symbol) -> str:
     return rf"\int {sp.latex(expr)}\,d{sp.latex(x)}"
+
+
+def _iterated_integral_operator(expr: sp.Expr, specs: List[Dict[str, Any]]) -> str:
+    operators = "".join(
+        rf"\int_{{{sp.latex(spec['lower'])}}}^{{{sp.latex(spec['upper'])}}}"
+        for spec in reversed(specs)
+    )
+    differentials = "".join(rf"\,d{sp.latex(spec['symbol'])}" for spec in specs)
+    return rf"{operators} {sp.latex(expr)}{differentials}"
+
+
+def _iterated_integral_name(total: int) -> str:
+    if total == 2:
+        return "doble"
+    if total == 3:
+        return "triple"
+    return "iterada"
 
 
 def _is_constant(expr: sp.Expr, x: sp.Symbol) -> bool:
@@ -430,6 +469,130 @@ def _integral_steps(
     return steps, result
 
 
+def _iterated_integral_position(index: int, total: int) -> str:
+    if total == 3:
+        return ("interna", "intermedia", "externa")[index]
+    if index == 0:
+        return "interna"
+    if index == total - 1:
+        return "externa"
+    return f"intermedia {index}"
+
+
+def _validate_iterated_bounds(specs: List[Dict[str, Any]]) -> None:
+    for index, spec in enumerate(specs):
+        current_symbol = spec["symbol"]
+        allowed_symbols = {item["symbol"] for item in specs[index + 1:]}
+        allowed_names = ", ".join(sp.sstr(symbol) for symbol in specs[index + 1:])
+
+        for bound_name, bound_expr in (("inferior", spec["lower"]), ("superior", spec["upper"])):
+            if current_symbol in bound_expr.free_symbols:
+                raise ValueError(
+                    f"El límite {bound_name} de {spec['variable']} no puede depender de la misma variable."
+                )
+
+            invalid_symbols = bound_expr.free_symbols - allowed_symbols
+            if invalid_symbols:
+                invalid_names = ", ".join(sorted(sp.sstr(symbol) for symbol in invalid_symbols))
+                if allowed_names:
+                    raise ValueError(
+                        f"El límite {bound_name} de {spec['variable']} solo puede depender de {allowed_names}; "
+                        f"se encontró {invalid_names}."
+                    )
+                raise ValueError(
+                    f"El límite {bound_name} de {spec['variable']} debe ser constante; se encontró {invalid_names}."
+                )
+
+
+def _iterated_integral_steps(
+    expr: sp.Expr,
+    specs: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, str]], sp.Expr]:
+    integral_name = _iterated_integral_name(len(specs))
+    steps = [
+        _step(
+            f"Integral {integral_name} original",
+            "Se plantea la integral iterada en el orden indicado, de adentro hacia afuera.",
+            _iterated_integral_operator(expr, specs),
+        )
+    ]
+
+    current = expr
+    total = len(specs)
+    for index, spec in enumerate(specs):
+        x = spec["symbol"]
+        a_expr = spec["lower"]
+        b_expr = spec["upper"]
+        position = _iterated_integral_position(index, total)
+        antiderivative = sp.simplify(sp.integrate(current, x))
+
+        if antiderivative.has(sp.Integral):
+            raise ValueError(
+                f"No se pudo resolver simbólicamente la integración respecto de {spec['variable']}."
+            )
+
+        steps.append(
+            _step(
+                f"Paso {index + 1}: integral {position}",
+                (
+                    f"Se integra respecto de {spec['variable']} y las demás variables se tratan como constantes."
+                ),
+                rf"\int {sp.latex(current)}\,d{sp.latex(x)} = {sp.latex(antiderivative)}",
+            )
+        )
+
+        evaluated = sp.simplify(antiderivative.subs(x, b_expr) - antiderivative.subs(x, a_expr))
+        steps.append(
+            _step(
+                f"Paso {index + 1}: evaluar límites de {spec['variable']}",
+                "Se reemplazan el límite superior e inferior y se calcula F(b) - F(a).",
+                rf"\left[{sp.latex(antiderivative)}\right]_{{{sp.latex(a_expr)}}}^{{{sp.latex(b_expr)}}} = {sp.latex(evaluated)}",
+            )
+        )
+
+        current = evaluated
+        remaining_specs = specs[index + 1:]
+        if remaining_specs:
+            steps.append(
+                _step(
+                    f"Integrando restante tras {spec['variable']}",
+                    "El resultado obtenido se usa como nuevo integrando para la siguiente integral.",
+                    _iterated_integral_operator(current, remaining_specs),
+                )
+            )
+
+    steps.append(
+        _step(
+            "Resultado final",
+            f"Se simplifica el valor final de la integral {integral_name}.",
+            sp.latex(sp.simplify(current)),
+        )
+    )
+    return steps, sp.simplify(current)
+
+
+def _derivative_display_latex(expr: sp.Expr, x: sp.Symbol, order: int, result: sp.Expr) -> str:
+    derivative_operator = (
+        rf"\frac{{d^{{{order}}}}}{{d{sp.latex(x)}^{{{order}}}}}"
+        if order > 1
+        else rf"\frac{{d}}{{d{sp.latex(x)}}}"
+    )
+    return rf"{derivative_operator}\left({sp.latex(expr)}\right) = {sp.latex(result)}"
+
+
+def _single_integral_display_latex(
+    expr: sp.Expr,
+    x: sp.Symbol,
+    result: sp.Expr,
+    definite: bool = False,
+    a_expr: Optional[sp.Expr] = None,
+    b_expr: Optional[sp.Expr] = None,
+) -> str:
+    if definite and a_expr is not None and b_expr is not None:
+        return rf"\int_{{{sp.latex(a_expr)}}}^{{{sp.latex(b_expr)}}} {sp.latex(expr)}\,d{sp.latex(x)} = {sp.latex(result)}"
+    return rf"\int {sp.latex(expr)}\,d{sp.latex(x)} = {sp.latex(result)} + C"
+
+
 def _polynomial_form(label: str, expr: sp.Expr) -> Dict[str, str]:
     return {
         "label": label,
@@ -527,22 +690,30 @@ def calculate_symbolic(req: CalculusRequest):
     """Calculate symbolic derivatives and integrals with explanatory steps."""
     try:
         operation = req.operation.strip().lower()
-        variable = req.variable.strip() or "x"
-        x = sp.Symbol(variable)
         operation, expression_text = _extract_inline_calculus_command(operation, req.expression)
         if not expression_text:
             raise ValueError("Ingresá una expresión para calcular.")
-        expr = _parse_symbolic_expression(expression_text, variable)
+        derivative_evaluation = None
         a_expr = None
         b_expr = None
-        derivative_evaluation = None
+        bounds_payload: List[Dict[str, Optional[str]]] = []
+        response_variables: List[str] = []
+        display_latex = ""
+        approximate = None
+        response_definite = False
 
         if operation in ("derivar", "derivada", "derivative", "diff"):
+            variable = req.variable.strip() or "x"
+            x = sp.Symbol(variable)
+            expr = _parse_symbolic_expression(expression_text, variable)
             steps, result = _derivative_steps(expr, x, req.order)
             operation_label = "Derivada"
             result_latex = sp.latex(result)
             result_plain = _format_plain(result)
             message = f"{operation_label} final: {result_plain}"
+            response_variables = [variable]
+            display_latex = _derivative_display_latex(expr, x, req.order, result)
+            response_definite = False
 
             if req.eval_at and str(req.eval_at).strip():
                 point_text = str(req.eval_at).strip()
@@ -566,29 +737,94 @@ def calculate_symbolic(req: CalculusRequest):
                     f"{_format_plain(evaluated)}"
                 )
         elif operation in ("integrar", "integral", "integrate"):
-            a_expr = _parse_symbolic_expression(req.a, variable) if req.a else None
-            b_expr = _parse_symbolic_expression(req.b, variable) if req.b else None
-            steps, result = _integral_steps(expr, x, req.definite, a_expr, b_expr)
-            operation_label = "Integral definida" if req.definite else "Integral indefinida"
-            result_latex = sp.latex(result) if req.definite else rf"{sp.latex(result)} + C"
-            result_plain = _format_plain(result) if req.definite else f"{_format_plain(result)} + C"
-            message = f"{operation_label} final: {result_plain}"
+            integral_mode = req.integral_mode.strip().lower() if req.integral_mode else "simple"
+
+            if integral_mode == "double":
+                response_variables = _normalize_variable_names(req.double_variables or ["x", "y"])
+                if len(response_variables) != 2:
+                    raise ValueError("La integral doble necesita exactamente dos variables de integración.")
+
+                expr = _parse_symbolic_expression(expression_text, response_variables)
+                lower_bounds = list(req.double_lower_bounds or [])
+                upper_bounds = list(req.double_upper_bounds or [])
+                if len(lower_bounds) != 2 or len(upper_bounds) != 2:
+                    raise ValueError("Ingresá los dos límites inferiores y superiores para la integral doble.")
+
+                specs: List[Dict[str, Any]] = []
+                for variable_name, lower_text, upper_text in zip(response_variables, lower_bounds, upper_bounds):
+                    lower_value = str(lower_text).strip()
+                    upper_value = str(upper_text).strip()
+                    if not lower_value or not upper_value:
+                        raise ValueError("Todos los límites de la integral doble deben estar completos.")
+
+                    lower_expr = _parse_symbolic_expression(lower_value, response_variables)
+                    upper_expr = _parse_symbolic_expression(upper_value, response_variables)
+                    specs.append({
+                        "variable": variable_name,
+                        "symbol": sp.Symbol(variable_name),
+                        "lower": lower_expr,
+                        "upper": upper_expr,
+                    })
+
+                _validate_iterated_bounds(specs)
+                steps, result = _iterated_integral_steps(expr, specs)
+                operation_label = "Integral doble"
+                result_latex = sp.latex(result)
+                result_plain = _format_plain(result)
+                message = f"{operation_label} final: {result_plain}"
+                display_latex = rf"{_iterated_integral_operator(expr, specs)} = {sp.latex(result)}"
+                bounds_payload = [
+                    {
+                        "variable": spec["variable"],
+                        "lower_latex": sp.latex(spec["lower"]),
+                        "upper_latex": sp.latex(spec["upper"]),
+                    }
+                    for spec in specs
+                ]
+                variable = response_variables[0]
+                approximate = _format_numeric(result)
+                response_definite = True
+            else:
+                variable = req.variable.strip() or "x"
+                x = sp.Symbol(variable)
+                expr = _parse_symbolic_expression(expression_text, variable)
+                a_expr = _parse_symbolic_expression(req.a, variable) if req.a else None
+                b_expr = _parse_symbolic_expression(req.b, variable) if req.b else None
+                steps, result = _integral_steps(expr, x, req.definite, a_expr, b_expr)
+                operation_label = "Integral definida" if req.definite else "Integral indefinida"
+                result_latex = sp.latex(result) if req.definite else rf"{sp.latex(result)} + C"
+                result_plain = _format_plain(result) if req.definite else f"{_format_plain(result)} + C"
+                message = f"{operation_label} final: {result_plain}"
+                response_variables = [variable]
+                display_latex = _single_integral_display_latex(expr, x, result, req.definite, a_expr, b_expr)
+                bounds_payload = (
+                    [
+                        {
+                            "variable": variable,
+                            "lower_latex": sp.latex(a_expr) if a_expr is not None else None,
+                            "upper_latex": sp.latex(b_expr) if b_expr is not None else None,
+                        }
+                    ]
+                    if req.definite
+                    else []
+                )
+                approximate = _format_numeric(result) if req.definite else None
+                response_definite = req.definite
         else:
             raise ValueError("Operación no reconocida. Usá 'derivar' o 'integrar'.")
-
-        approximate = None
-        if operation in ("integrar", "integral", "integrate") and req.definite:
-            approximate = float(sp.N(result))
 
         return {
             "operation": operation_label,
             "expression": _format_plain(expr),
             "expression_latex": sp.latex(expr),
             "variable": variable,
+            "variables": response_variables,
             "order": req.order,
-            "definite": req.definite,
+            "definite": response_definite,
             "lower_latex": sp.latex(a_expr) if a_expr is not None else None,
             "upper_latex": sp.latex(b_expr) if b_expr is not None else None,
+            "bounds": bounds_payload,
+            "display_latex": display_latex,
             "result": result_plain,
             "result_latex": result_latex,
             "approximate": approximate,

@@ -4,11 +4,18 @@ import { CalculadoraCientifica } from './CalculadoraCientifica';
 import { RenderLatex } from './RenderLatex';
 
 type CalculusOperation = 'derivar' | 'integrar';
+type IntegralMode = 'simple' | 'double';
 
 interface CalculusStep {
   title: string;
   detail: string;
   math: string;
+}
+
+interface CalculusBound {
+  variable: string;
+  lower_latex: string | null;
+  upper_latex: string | null;
 }
 
 interface DerivativeEvaluation {
@@ -24,10 +31,13 @@ interface CalculusResult {
   expression: string;
   expression_latex: string;
   variable: string;
+  variables: string[];
   order: number;
   definite: boolean;
   lower_latex: string | null;
   upper_latex: string | null;
+  bounds: CalculusBound[];
+  display_latex: string;
   result: string;
   result_latex: string;
   approximate: number | null;
@@ -36,15 +46,23 @@ interface CalculusResult {
   message: string;
 }
 
+interface DoubleIntegralEntry {
+  variable: string;
+  lower: string;
+  upper: string;
+}
+
 interface CalculusForm {
   operation: CalculusOperation;
   expression: string;
   variable: string;
   order: string;
   definite: boolean;
+  integralMode: IntegralMode;
   a: string;
   b: string;
   eval_at: string;
+  doubleEntries: DoubleIntegralEntry[];
 }
 
 interface ApiError {
@@ -63,9 +81,14 @@ export const CalculadoraCalculo: React.FC = () => {
     variable: 'x',
     order: '1',
     definite: false,
+    integralMode: 'simple',
     a: '0',
     b: '1',
     eval_at: '',
+    doubleEntries: [
+      { variable: 'x', lower: '0', upper: '1' },
+      { variable: 'y', lower: '0', upper: '1' },
+    ],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +97,19 @@ export const CalculadoraCalculo: React.FC = () => {
 
   const updateForm = <K extends keyof CalculusForm>(field: K, value: CalculusForm[K]) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateDoubleEntry = <K extends keyof DoubleIntegralEntry>(
+    index: number,
+    field: K,
+    value: DoubleIntegralEntry[K],
+  ) => {
+    setForm(prev => ({
+      ...prev,
+      doubleEntries: prev.doubleEntries.map((entry, entryIndex) => (
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )),
+    }));
   };
 
   const handleInsertCode = (code: string) => {
@@ -95,6 +131,9 @@ export const CalculadoraCalculo: React.FC = () => {
     }, 0);
   };
 
+  const isDoubleIntegral = form.operation === 'integrar' && form.integralMode === 'double';
+  const doubleStepLabels = ['Interna', 'Externa'];
+
   const executeCalculus = async () => {
     setLoading(true);
     setError(null);
@@ -106,10 +145,14 @@ export const CalculadoraCalculo: React.FC = () => {
         expression: form.expression,
         variable: form.variable || 'x',
         order: Math.max(1, parseInt(form.order, 10) || 1),
-        definite: form.operation === 'integrar' ? form.definite : false,
-        a: form.definite ? form.a : undefined,
-        b: form.definite ? form.b : undefined,
+        definite: form.operation === 'integrar' ? (isDoubleIntegral ? true : form.definite) : false,
+        integral_mode: form.operation === 'integrar' ? form.integralMode : 'simple',
+        a: form.operation === 'integrar' && form.integralMode === 'simple' && form.definite ? form.a : undefined,
+        b: form.operation === 'integrar' && form.integralMode === 'simple' && form.definite ? form.b : undefined,
         eval_at: form.operation === 'derivar' && form.eval_at.trim() ? form.eval_at : undefined,
+        double_variables: isDoubleIntegral ? form.doubleEntries.map(entry => entry.variable) : [],
+        double_lower_bounds: isDoubleIntegral ? form.doubleEntries.map(entry => entry.lower) : [],
+        double_upper_bounds: isDoubleIntegral ? form.doubleEntries.map(entry => entry.upper) : [],
       });
 
       setResult(res.data);
@@ -123,6 +166,7 @@ export const CalculadoraCalculo: React.FC = () => {
 
   const finalMath = (() => {
     if (!result) return '';
+    if (result.display_latex) return result.display_latex;
 
     const variable = result.variable || 'x';
     const derivativeOperator = result.order > 1
@@ -163,6 +207,25 @@ export const CalculadoraCalculo: React.FC = () => {
             </button>
           </div>
 
+          {form.operation === 'integrar' && (
+            <div className="calc-operation-tabs calculus-subtabs" role="tablist" aria-label="Tipo de integral">
+              <button
+                type="button"
+                className={`calc-operation-btn ${form.integralMode === 'simple' ? 'active' : ''}`}
+                onClick={() => updateForm('integralMode', 'simple')}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                className={`calc-operation-btn ${form.integralMode === 'double' ? 'active' : ''}`}
+                onClick={() => updateForm('integralMode', 'double')}
+              >
+                Doble
+              </button>
+            </div>
+          )}
+
           <div className="form-grid">
             <div className="form-group full-width">
               <label htmlFor="calculus-expression">Expresión</label>
@@ -179,20 +242,19 @@ export const CalculadoraCalculo: React.FC = () => {
 
             <CalculadoraCientifica onInsert={handleInsertCode} targetLabel="expresión" />
 
-            <div className="form-grid half">
-              <div className="form-group">
-                <label htmlFor="calculus-variable">Variable</label>
-                <input
-                  id="calculus-variable"
-                  type="text"
-                  value={form.variable}
-                  maxLength={12}
-                  autoComplete="off"
-                  onChange={event => updateForm('variable', event.target.value)}
-                />
-              </div>
-
-              {form.operation === 'derivar' ? (
+            {form.operation === 'derivar' ? (
+              <div className="form-grid half">
+                <div className="form-group">
+                  <label htmlFor="calculus-variable">Variable</label>
+                  <input
+                    id="calculus-variable"
+                    type="text"
+                    value={form.variable}
+                    maxLength={12}
+                    autoComplete="off"
+                    onChange={event => updateForm('variable', event.target.value)}
+                  />
+                </div>
                 <div className="form-group">
                   <label htmlFor="calculus-order">Orden</label>
                   <input
@@ -205,7 +267,20 @@ export const CalculadoraCalculo: React.FC = () => {
                     onChange={event => updateForm('order', event.target.value)}
                   />
                 </div>
-              ) : (
+              </div>
+            ) : form.integralMode === 'simple' ? (
+              <div className="form-grid half">
+                <div className="form-group">
+                  <label htmlFor="calculus-variable">Variable</label>
+                  <input
+                    id="calculus-variable"
+                    type="text"
+                    value={form.variable}
+                    maxLength={12}
+                    autoComplete="off"
+                    onChange={event => updateForm('variable', event.target.value)}
+                  />
+                </div>
                 <div className="form-group calculus-check-group">
                   <span className="calculus-check-spacer" aria-hidden="true"></span>
                   <label className="calculus-check">
@@ -217,8 +292,52 @@ export const CalculadoraCalculo: React.FC = () => {
                     <span>Definida</span>
                   </label>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="form-group full-width">
+                <label>
+                  Orden de integración
+                  <span className="field-hint">Completá las dos variables de adentro hacia afuera con sus límites.</span>
+                </label>
+                <div className="calculus-double-grid">
+                  {form.doubleEntries.map((entry, index) => (
+                    <div className="calculus-double-row" key={`${index}-${entry.variable}`}>
+                      <div className="form-group">
+                        <label htmlFor={`double-variable-${index}`}>Variable {doubleStepLabels[index]}</label>
+                        <input
+                          id={`double-variable-${index}`}
+                          type="text"
+                          value={entry.variable}
+                          maxLength={12}
+                          autoComplete="off"
+                          onChange={event => updateDoubleEntry(index, 'variable', event.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor={`double-lower-${index}`}>Límite inferior</label>
+                        <input
+                          id={`double-lower-${index}`}
+                          type="text"
+                          value={entry.lower}
+                          autoComplete="off"
+                          onChange={event => updateDoubleEntry(index, 'lower', event.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor={`double-upper-${index}`}>Límite superior</label>
+                        <input
+                          id={`double-upper-${index}`}
+                          type="text"
+                          value={entry.upper}
+                          autoComplete="off"
+                          onChange={event => updateDoubleEntry(index, 'upper', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {form.operation === 'derivar' && (
               <div className="form-group full-width">
@@ -237,7 +356,7 @@ export const CalculadoraCalculo: React.FC = () => {
               </div>
             )}
 
-            {form.operation === 'integrar' && form.definite && (
+            {form.operation === 'integrar' && form.integralMode === 'simple' && form.definite && (
               <div className="form-grid half">
                 <div className="form-group">
                   <label htmlFor="calculus-a">a</label>
