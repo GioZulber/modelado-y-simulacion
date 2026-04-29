@@ -1022,6 +1022,15 @@ input[type="checkbox"]:checked::before {
   font-size: 0.82rem;
 }
 
+.calculus-evaluation {
+  margin-top: 0.35rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(16, 185, 129, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .calculus-steps {
   display: flex;
   flex-direction: column;

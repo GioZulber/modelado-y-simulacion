@@ -58,6 +58,7 @@ class CalculusRequest(BaseModel):
     definite: bool = False
     a: Optional[str] = None
     b: Optional[str] = None
+    eval_at: Optional[str] = None
 
 
 def eval_math_expr(expr_str: str) -> float:
@@ -213,6 +214,14 @@ def _is_constant(expr: sp.Expr, x: sp.Symbol) -> bool:
 def _format_plain(expr: sp.Expr) -> str:
     text = str(sp.sstr(sp.simplify(expr)))
     return re.sub(r"(?<=\d)\*(?=[A-Za-z_])", "", text)
+
+
+def _format_numeric(value: sp.Expr) -> Optional[float]:
+    try:
+        numeric = float(sp.N(value))
+    except Exception:
+        return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _extract_inline_calculus_command(operation: str, expression: str) -> tuple[str, str]:
@@ -436,6 +445,7 @@ def calculate_symbolic(req: CalculusRequest):
         expr = _parse_symbolic_expression(expression_text, variable)
         a_expr = None
         b_expr = None
+        derivative_evaluation = None
 
         if operation in ("derivar", "derivada", "derivative", "diff"):
             steps, result = _derivative_steps(expr, x, req.order)
@@ -443,6 +453,28 @@ def calculate_symbolic(req: CalculusRequest):
             result_latex = sp.latex(result)
             result_plain = _format_plain(result)
             message = f"{operation_label} final: {result_plain}"
+
+            if req.eval_at and str(req.eval_at).strip():
+                point_text = str(req.eval_at).strip()
+                if "=" in point_text and point_text.split("=", 1)[0].strip() == variable:
+                    point_text = point_text.split("=", 1)[1].strip()
+
+                point_expr = _parse_symbolic_expression(point_text, variable)
+                if point_expr.free_symbols:
+                    raise ValueError("El punto de evaluacion debe ser un valor numerico, por ejemplo 2 o pi/4.")
+
+                evaluated = sp.simplify(result.subs(x, point_expr))
+                derivative_evaluation = {
+                    "point": _format_plain(point_expr),
+                    "point_latex": sp.latex(point_expr),
+                    "value": _format_plain(evaluated),
+                    "value_latex": sp.latex(evaluated),
+                    "approximate": _format_numeric(evaluated),
+                }
+                message += (
+                    f"\nEvaluacion en {variable} = {_format_plain(point_expr)}: "
+                    f"{_format_plain(evaluated)}"
+                )
         elif operation in ("integrar", "integral", "integrate"):
             a_expr = _parse_symbolic_expression(req.a, variable) if req.a else None
             b_expr = _parse_symbolic_expression(req.b, variable) if req.b else None
@@ -470,6 +502,7 @@ def calculate_symbolic(req: CalculusRequest):
             "result": result_plain,
             "result_latex": result_latex,
             "approximate": approximate,
+            "derivative_evaluation": derivative_evaluation,
             "steps": steps,
             "message": message,
         }

@@ -11,6 +11,14 @@ interface CalculusStep {
   math: string;
 }
 
+interface DerivativeEvaluation {
+  point: string;
+  point_latex: string;
+  value: string;
+  value_latex: string;
+  approximate: number | null;
+}
+
 interface CalculusResult {
   operation: string;
   expression: string;
@@ -23,6 +31,7 @@ interface CalculusResult {
   result: string;
   result_latex: string;
   approximate: number | null;
+  derivative_evaluation: DerivativeEvaluation | null;
   steps: CalculusStep[];
   message: string;
 }
@@ -35,6 +44,7 @@ interface CalculusForm {
   definite: boolean;
   a: string;
   b: string;
+  eval_at: string;
 }
 
 interface ApiError {
@@ -55,6 +65,7 @@ export const CalculadoraCalculo: React.FC = () => {
     definite: false,
     a: '0',
     b: '1',
+    eval_at: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +109,7 @@ export const CalculadoraCalculo: React.FC = () => {
         definite: form.operation === 'integrar' ? form.definite : false,
         a: form.definite ? form.a : undefined,
         b: form.definite ? form.b : undefined,
+        eval_at: form.operation === 'derivar' && form.eval_at.trim() ? form.eval_at : undefined,
       });
 
       setResult(res.data);
@@ -208,6 +220,23 @@ export const CalculadoraCalculo: React.FC = () => {
               )}
             </div>
 
+            {form.operation === 'derivar' && (
+              <div className="form-group full-width">
+                <label htmlFor="calculus-eval-at">
+                  Evaluar en un punto
+                  <span className="field-hint">Opcional. Acepta valores como 2, pi/4 o sqrt(2)</span>
+                </label>
+                <input
+                  id="calculus-eval-at"
+                  type="text"
+                  value={form.eval_at}
+                  placeholder={`ej: ${form.variable || 'x'} = 2`}
+                  autoComplete="off"
+                  onChange={event => updateForm('eval_at', event.target.value)}
+                />
+              </div>
+            )}
+
             {form.operation === 'integrar' && form.definite && (
               <div className="form-grid half">
                 <div className="form-group">
@@ -263,6 +292,23 @@ export const CalculadoraCalculo: React.FC = () => {
               <strong className="calculus-final-code">{result.result}</strong>
               {result.approximate !== null && Number.isFinite(result.approximate) && (
                 <span className="calculus-approx">Aproximación: {result.approximate.toPrecision(10)}</span>
+              )}
+
+              {result.derivative_evaluation && (
+                <div className="calculus-evaluation">
+                  <span className="result-highlight-label">Evaluacion puntual</span>
+                  <RenderLatex
+                    math={`\\left. ${result.result_latex} \\right|_{${result.variable}=${result.derivative_evaluation.point_latex}} = ${result.derivative_evaluation.value_latex}`}
+                  />
+                  <strong className="calculus-final-code">
+                    {result.variable} = {result.derivative_evaluation.point} =&gt; {result.derivative_evaluation.value}
+                  </strong>
+                  {result.derivative_evaluation.approximate !== null && Number.isFinite(result.derivative_evaluation.approximate) && (
+                    <span className="calculus-approx">
+                      Aproximacion: {result.derivative_evaluation.approximate.toPrecision(10)}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
