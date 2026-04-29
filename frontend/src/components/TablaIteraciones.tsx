@@ -2,11 +2,17 @@ import React from 'react';
 
 interface TablaProps {
   headers: string[];
-  iterations: any[][];
+  iterations: unknown[][];
   isSuccess?: boolean;
 }
 
 export const TablaIteraciones: React.FC<TablaProps> = ({ headers, iterations, isSuccess = false }) => {
+  const formatCellValue = (value: unknown) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
   return (
     <div className="table-wrapper">
       <table className="results-table">
@@ -24,7 +30,7 @@ export const TablaIteraciones: React.FC<TablaProps> = ({ headers, iterations, is
             return (
               <tr key={rowIndex} className={highlightClass}>
                 {row.map((val, colIndex) => (
-                  <td key={colIndex}>{val !== null && val !== undefined ? val : '—'}</td>
+                  <td key={colIndex}>{formatCellValue(val)}</td>
                 ))}
               </tr>
             );

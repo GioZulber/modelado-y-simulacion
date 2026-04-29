@@ -19,10 +19,9 @@ export const CalculadoraCientifica: React.FC<CalculadoraProps> = ({ onInsert, ta
   const mathRef = useRef<HTMLDivElement>(null);
 
   const getCodeString = () => tokens.map(t => t.code).join('');
-  const getLatexString = () => tokens.map(t => t.latex).join('');
 
   useEffect(() => {
-    const rawLatex = getLatexString();
+    const rawLatex = tokens.map(t => t.latex).join('');
     
     if (mathRef.current && isOpen) {
       if (rawLatex) {

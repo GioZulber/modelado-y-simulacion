@@ -3,6 +3,7 @@ import { BookOpen, X } from 'lucide-react';
 import api from './api';
 import { CalculadoraCalculo } from './components/CalculadoraCalculo';
 import { CalculadoraCientifica } from './components/CalculadoraCientifica';
+import { CalculadoraPolinomios } from './components/CalculadoraPolinomios';
 import { GraficoResultados } from './components/GraficoResultados';
 import { TablaIteraciones } from './components/TablaIteraciones';
 import { RenderLatex } from './components/RenderLatex';
@@ -33,6 +34,65 @@ interface MarcoTeorico {
   condiciones: string[];
 }
 
+interface MethodInfo {
+  nombre: string;
+  clase?: string;
+  requiere: string[];
+  opcionales?: string[];
+  headers: string[];
+  marco_teorico?: MarcoTeorico;
+}
+
+interface MethodOption {
+  key: string;
+  nombre: string;
+}
+
+interface PlotSeries {
+  x: number[];
+  y: number[];
+  center?: number;
+  label?: string;
+}
+
+interface PointData {
+  x: number;
+  y: number;
+}
+
+interface PlotWindow {
+  x_min: number;
+  x_max: number;
+}
+
+interface SolveResult {
+  headers: string[];
+  iterations: unknown[][];
+  message?: string;
+  latex_str?: string | null;
+  latex_decimal_str?: string | null;
+  bases_latex?: string[] | null;
+  errores_latex?: string[] | null;
+  plot?: PlotSeries | null;
+  plot_secondary?: PlotSeries | null;
+  plot_bases?: PlotSeries[] | null;
+  nodes?: PointData[] | null;
+  root?: PointData | null;
+  is_fx: boolean;
+  plot_window?: PlotWindow | null;
+  integration_window?: PlotWindow | null;
+  is_newton_cotes?: boolean;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+  message?: string;
+}
+
 const HIGHLIGHT_PATTERNS = [
   /integral aproximada/i,
   /ra[ií]z/i,
@@ -41,7 +101,13 @@ const HIGHLIGHT_PATTERNS = [
   /valor aprox/i,
   /x_aitken/i,
   /error local/i,
+  /error de truncamiento/i,
 ];
+
+function getErrorMessage(err: unknown): string {
+  const apiError = err as ApiError;
+  return apiError.response?.data?.detail || apiError.message || 'Error desconocido';
+}
 
 function parseResultSummary(message?: string): ParsedResultSummary | null {
   if (!message) return null;
@@ -106,9 +172,9 @@ function parseResultSummary(message?: string): ParsedResultSummary | null {
 }
 
 function App() {
-  const [workspaceMode, setWorkspaceMode] = useState<'numerical' | 'calculus'>('numerical');
-  const [methodsRegistry, setMethodsRegistry] = useState<any>({});
-  const [methodGroups, setMethodGroups] = useState<any>({});
+  const [workspaceMode, setWorkspaceMode] = useState<'numerical' | 'calculus' | 'polynomial'>('numerical');
+  const [methodsRegistry, setMethodsRegistry] = useState<Record<string, MethodInfo>>({});
+  const [methodGroups, setMethodGroups] = useState<Record<string, MethodOption[]>>({});
   const [selectedMethod, setSelectedMethod] = useState<string>('');
   
   const [inputs, setInputs] = useState({
@@ -122,6 +188,7 @@ function App() {
     confidence_level: '95',
     a: '1',
     b: '2',
+    e: '',
     x0: '1',
     y0: '0.5',
     h: '0.2',
@@ -132,11 +199,11 @@ function App() {
     precision: '8'
   });
 
-  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr' | 'x_data' | 'y_data' | 'exact_expr'>('f_expr');
+  const [activeInput, setActiveInput] = useState<'f_expr' | 'g_expr' | 'x_data' | 'y_data' | 'exact_expr' | 'e'>('f_expr');
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<SolveResult | null>(null);
   const [theoryOpen, setTheoryOpen] = useState(false);
 
   const [plotOptions, setPlotOptions] = useState({
@@ -152,21 +219,22 @@ function App() {
   const inputXdataRef = useRef<HTMLInputElement>(null);
   const inputYdataRef = useRef<HTMLInputElement>(null);
   const inputExactRef = useRef<HTMLInputElement>(null);
+  const inputERef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.get('/api/methods')
+    api.get<Record<string, MethodInfo>>('/api/methods')
       .then(res => {
         const data = res.data;
         setMethodsRegistry(data);
         
-        const groups: any = {};
+        const groups: Record<string, MethodOption[]> = {};
         for (const [key, info] of Object.entries(data)) {
-          const clase = (info as any).clase || 'General';
+          const clase = info.clase || 'General';
           if (!groups[clase]) groups[clase] = [];
-          groups[clase].push({ key, nombre: (info as any).nombre });
+          groups[clase].push({ key, nombre: info.nombre });
         }
         
-        const sortedGroups: any = {};
+        const sortedGroups: Record<string, MethodOption[]> = {};
         Object.keys(groups).sort().forEach(k => sortedGroups[k] = groups[k]);
         
         setMethodGroups(sortedGroups);
@@ -176,8 +244,8 @@ function App() {
           setSelectedMethod(sortedGroups[firstClass][0].key);
         }
       })
-      .catch(err => {
-        setMessage({ text: 'Error cargando métodos: ' + err.message, type: 'error' });
+      .catch((err: unknown) => {
+        setMessage({ text: 'Error cargando métodos: ' + getErrorMessage(err), type: 'error' });
       });
   }, []);
 
@@ -194,10 +262,10 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [theoryOpen]);
 
-  const currentInfo = methodsRegistry[selectedMethod] || {};
-  const requires = currentInfo.requiere || [];
-  const opcionales = currentInfo.opcionales || [];
-  const currentTheory = currentInfo.marco_teorico as MarcoTeorico | null | undefined;
+  const currentInfo = methodsRegistry[selectedMethod];
+  const requires = currentInfo?.requiere || [];
+  const opcionales = currentInfo?.opcionales || [];
+  const currentTheory = currentInfo?.marco_teorico;
   const parsedSummary = parseResultSummary(results?.message);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,7 +285,8 @@ function App() {
       g_expr: inputGxRef,
       x_data: inputXdataRef,
       y_data: inputYdataRef,
-      exact_expr: inputExactRef
+      exact_expr: inputExactRef,
+      e: inputERef
     };
     
     const inputRef = refs[activeInput]?.current;
@@ -249,11 +318,12 @@ function App() {
     });
 
     try {
-      const res = await api.post('/api/solve', {
+      const res = await api.post<SolveResult>('/api/solve', {
         method: selectedMethod,
         ...inputs,
         a: inputs.a || undefined,
         b: inputs.b || undefined,
+        e: inputs.e || undefined,
         x0: inputs.x0 || undefined,
         n: inputs.n || undefined,
         max_iter: parseInt(inputs.max_iter),
@@ -262,10 +332,10 @@ function App() {
       });
       
       setResults(res.data);
-      setMessage({ text: res.data.message, type: 'success' });
-    } catch (err: any) {
+      setMessage({ text: res.data.message ?? 'Cálculo finalizado', type: 'success' });
+    } catch (err: unknown) {
       setMessage({ 
-        text: err.response?.data?.detail || err.message || 'Error desconocido', 
+        text: getErrorMessage(err), 
         type: 'error' 
       });
     } finally {
@@ -277,6 +347,7 @@ function App() {
     if (activeInput === 'x_data') return 'x_data';
     if (activeInput === 'y_data') return 'y_data';
     if (activeInput === 'exact_expr') return 'y exacta';
+    if (activeInput === 'e') return 'e';
     
     const hasF = requires.includes('f_expr') || opcionales.includes('f_expr');
     const hasG = requires.includes('g_expr') || opcionales.includes('g_expr');
@@ -326,11 +397,20 @@ function App() {
           >
             Derivadas e integrales
           </button>
+          <button
+            type="button"
+            className={`workspace-tab ${workspaceMode === 'polynomial' ? 'active' : ''}`}
+            onClick={() => setWorkspaceMode('polynomial')}
+          >
+            Polinomios
+          </button>
         </div>
       </header>
 
       {workspaceMode === 'calculus' ? (
         <CalculadoraCalculo />
+      ) : workspaceMode === 'polynomial' ? (
+        <CalculadoraPolinomios />
       ) : (
       <main className="dashboard-layout">
         {/* PANEL IZQUIERDO: Configuración */}
@@ -349,9 +429,9 @@ function App() {
                     const nextMethod = e.target.value;
                     setSelectedMethod(nextMethod);
                     setTheoryOpen(false);
-                    const info = methodsRegistry[nextMethod] || {};
-                    const req = info.requiere || [];
-                    const opt = info.opcionales || [];
+                    const info = methodsRegistry[nextMethod];
+                    const req = info?.requiere || [];
+                    const opt = info?.opcionales || [];
                     setActiveInput((req.includes('f_expr') || opt.includes('f_expr')) ? 'f_expr' : 'g_expr');
                     if (nextMethod === 'monte_carlo_integral') {
                       setInputs(prev => ({
@@ -377,9 +457,9 @@ function App() {
                   }}
                 >
                   {Object.keys(methodGroups).length === 0 && <option value="">Cargando métodos…</option>}
-                  {Object.entries(methodGroups).map(([clase, methods]: [string, any]) => (
+                  {Object.entries(methodGroups).map(([clase, methods]) => (
                     <optgroup label={clase} key={clase}>
-                      {methods.map((m: any) => (
+                      {methods.map(m => (
                         <option value={m.key} key={m.key}>{m.nombre}</option>
                       ))}
                     </optgroup>
@@ -554,6 +634,22 @@ function App() {
                 <input type="text" name="x0" id="input-x0" value={inputs.x0} onChange={handleInputChange} />
               </div>
 
+              <div className={`form-group ${!isVisible('e') ? 'hidden' : ''}`}>
+                <label htmlFor="input-e">
+                  e (Punto para error de truncamiento)
+                  <span className="field-hint" style={{display: 'block', fontSize: '0.7rem', marginTop: '2px'}}>Opcional. Ej: 0.5; acepta expresiones como `pi/2`</span>
+                </label>
+                <input
+                  type="text"
+                  name="e"
+                  id="input-e"
+                  ref={inputERef}
+                  value={inputs.e}
+                  onChange={handleInputChange}
+                  onFocus={() => setActiveInput('e')}
+                />
+              </div>
+
               <div className={`form-group ${!isVisible('y0') ? 'hidden' : ''}`}>
                 <label htmlFor="input-y0">
                   y₀ (Condicion inicial)
@@ -683,7 +779,7 @@ function App() {
                 <TablaIteraciones 
                   headers={results.headers} 
                   iterations={results.iterations} 
-                  isSuccess={results.message && (results.message.includes("encontrado") || results.message.includes("encontrada") || results.message.includes("exitosamente"))} 
+                  isSuccess={Boolean(results.message && (results.message.includes("encontrado") || results.message.includes("encontrada") || results.message.includes("exitosamente")))}
                 />
 
                 {results.bases_latex && results.bases_latex.length > 0 && (
@@ -791,11 +887,11 @@ function App() {
                 <section className="card" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
                   <div className="card-title"><span className="icon">📈</span> Lienzo Gráfico</div>
                   <GraficoResultados 
-                    plotData={plotOptions.showFx ? results.plot : null}
-                    plotSecondaryData={plotOptions.showPx ? results.plot_secondary : null}
-                    plotBasesData={plotOptions.showBases ? results.plot_bases : null}
-                    nodesData={results.nodes} 
-                    rootData={results.root} 
+                    plotData={plotOptions.showFx ? results.plot ?? null : null}
+                    plotSecondaryData={plotOptions.showPx ? results.plot_secondary ?? null : null}
+                    plotBasesData={plotOptions.showBases ? results.plot_bases ?? null : null}
+                    nodesData={results.nodes ?? null} 
+                    rootData={results.root ?? null} 
                     isFx={results.is_fx}
                     plotWindow={results.plot_window}
                     integrationWindow={results.integration_window}

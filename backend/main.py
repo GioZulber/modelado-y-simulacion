@@ -40,6 +40,7 @@ class SolveRequest(BaseModel):
     confidence_level: Optional[str] = None
     a: Optional[str] = None
     b: Optional[str] = None
+    e: Optional[str] = None
     x0: Optional[str] = None
     y0: Optional[str] = None
     h: Optional[str] = None
@@ -59,6 +60,13 @@ class CalculusRequest(BaseModel):
     a: Optional[str] = None
     b: Optional[str] = None
     eval_at: Optional[str] = None
+
+
+class PolynomialRequest(BaseModel):
+    operation: str = Field("expand", description="expand, factor, collect, simplify o all")
+    expression: str = Field(..., min_length=1)
+    variable: str = "x"
+    exact: bool = True
 
 
 def eval_math_expr(expr_str: str) -> float:
@@ -155,7 +163,8 @@ def parse_function(expr_str: Optional[str]):
         # Wrap it to return float and handle exceptions gracefully
         def safe_fn(val):
             try:
-                raw_res = fn(val)
+                with np.errstate(all="ignore"):
+                    raw_res = fn(val)
                 # Handle potential complex numbers returned by sympy/numpy
                 if isinstance(raw_res, complex):
                     if abs(raw_res.imag) < 1e-10:
@@ -169,6 +178,8 @@ def parse_function(expr_str: Optional[str]):
                 return res
             except Exception as exc:
                 raise ValueError(f"Could not evaluate at x={val}: {str(exc)}")
+        safe_fn._sympy_expr = expr
+        safe_fn._sympy_symbol = x
         return safe_fn
     except Exception as e:
         raise ValueError(f"Error parsing expression '{expr_str}': {str(e)}")
@@ -213,6 +224,11 @@ def _is_constant(expr: sp.Expr, x: sp.Symbol) -> bool:
 
 def _format_plain(expr: sp.Expr) -> str:
     text = str(sp.sstr(sp.simplify(expr)))
+    return re.sub(r"(?<=\d)\*(?=[A-Za-z_])", "", text)
+
+
+def _format_symbolic(expr: sp.Expr) -> str:
+    text = str(sp.sstr(expr))
     return re.sub(r"(?<=\d)\*(?=[A-Za-z_])", "", text)
 
 
@@ -413,6 +429,80 @@ def _integral_steps(
     )
     return steps, result
 
+
+def _polynomial_form(label: str, expr: sp.Expr) -> Dict[str, str]:
+    return {
+        "label": label,
+        "plain": _format_symbolic(expr),
+        "latex": sp.latex(expr),
+    }
+
+
+def _make_polynomial_coefficients(poly: sp.Poly, x: sp.Symbol) -> List[Dict[str, Any]]:
+    coefficients = []
+    degree = poly.degree()
+    for exponent, coefficient in zip(range(degree, -1, -1), poly.all_coeffs()):
+        term_expr = coefficient * x**exponent
+        coefficients.append({
+            "degree": int(exponent),
+            "coefficient": _format_symbolic(coefficient),
+            "coefficient_latex": sp.latex(coefficient),
+            "term_latex": sp.latex(term_expr),
+        })
+    return coefficients
+
+
+def _polynomial_steps(
+    original_expr: sp.Expr,
+    normalized_expr: sp.Expr,
+    expanded: sp.Expr,
+    collected: sp.Expr,
+    factored: sp.Expr,
+    simplified: sp.Expr,
+    exact: bool,
+) -> List[Dict[str, str]]:
+    steps = [
+        _step(
+            "Expresión original",
+            "Se toma la expresión ingresada como punto de partida.",
+            sp.latex(original_expr),
+        )
+    ]
+
+    if exact and sp.sstr(original_expr) != sp.sstr(normalized_expr):
+        steps.append(
+            _step(
+                "Normalización exacta",
+                "Los decimales se convierten a fracciones para evitar redondeos en el álgebra simbólica.",
+                sp.latex(normalized_expr),
+            )
+        )
+
+    steps.extend([
+        _step(
+            "Distributiva",
+            "Se expanden productos y potencias para obtener la suma de términos.",
+            sp.latex(expanded),
+        ),
+        _step(
+            "Agrupar términos semejantes",
+            "Se ordenan y agrupan los términos según la potencia de la variable.",
+            sp.latex(collected),
+        ),
+        _step(
+            "Factorizar",
+            "Se busca una forma factorizada equivalente.",
+            sp.latex(factored),
+        ),
+        _step(
+            "Simplificar",
+            "Se reduce la expresión conservando una forma algebraicamente equivalente.",
+            sp.latex(simplified),
+        ),
+    ])
+    return steps
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -510,6 +600,91 @@ def calculate_symbolic(req: CalculusRequest):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/api/polynomial")
+def calculate_polynomial(req: PolynomialRequest):
+    """Expand, factor, collect and simplify polynomial-like expressions."""
+    try:
+        variable = req.variable.strip() or "x"
+        if not re.match(r"^[A-Za-z_]\w*$", variable):
+            raise ValueError(f"Variable inválida '{variable}'")
+
+        x = sp.Symbol(variable)
+        original_expr = _parse_symbolic_expression(req.expression, variable)
+        expr = sp.nsimplify(original_expr, rational=True)
+
+        simplified = sp.simplify(expr)
+        expanded = sp.expand(expr)
+        collected = sp.collect(expanded, x)
+        factored = sp.factor(simplified)
+        cancelled = sp.cancel(simplified)
+
+        forms = {
+            "simplified": _polynomial_form("Simplificada", simplified),
+            "expanded": _polynomial_form("Expandida", expanded),
+            "collected": _polynomial_form("Agrupada por potencias", collected),
+            "factored": _polynomial_form("Factorizada", factored),
+            "cancelled": _polynomial_form("Racional simplificada", cancelled),
+        }
+
+        operation = req.operation.strip().lower()
+        operation_map = {
+            "expand": ("Expandir distributiva", expanded),
+            "expandir": ("Expandir distributiva", expanded),
+            "distributiva": ("Expandir distributiva", expanded),
+            "factor": ("Factorizar", factored),
+            "factorizar": ("Factorizar", factored),
+            "collect": ("Agrupar", collected),
+            "agrupar": ("Agrupar", collected),
+            "simplify": ("Simplificar", simplified),
+            "simplificar": ("Simplificar", simplified),
+            "all": ("Todas las formas", simplified),
+            "todo": ("Todas las formas", simplified),
+        }
+        if operation not in operation_map:
+            raise ValueError("Operación no reconocida. Usá expandir, factorizar, agrupar o simplificar.")
+
+        operation_label, final_expr = operation_map[operation]
+        degree = None
+        coefficients: List[Dict[str, Any]] = []
+        is_polynomial = True
+        polynomial_error = None
+
+        try:
+            poly = sp.Poly(expanded, x)
+            degree = int(poly.degree())
+            coefficients = _make_polynomial_coefficients(poly, x)
+        except Exception as exc:
+            is_polynomial = False
+            polynomial_error = f"No se pudo leer como polinomio en {variable}: {exc}"
+
+        return {
+            "operation": operation_label,
+            "expression": _format_symbolic(expr),
+            "expression_latex": sp.latex(expr),
+            "variable": variable,
+            "exact": True,
+            "is_polynomial": is_polynomial,
+            "polynomial_error": polynomial_error,
+            "degree": degree,
+            "final": _format_symbolic(final_expr),
+            "final_latex": sp.latex(final_expr),
+            "forms": forms,
+            "coefficients": coefficients,
+            "steps": _polynomial_steps(
+                original_expr,
+                expr,
+                expanded,
+                collected,
+                factored,
+                simplified,
+                True,
+            ),
+            "message": f"{operation_label}: {_format_symbolic(final_expr)}",
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/solve")
 def solve(req: SolveRequest):
     if req.method not in REGISTRY:
@@ -527,6 +702,7 @@ def solve(req: SolveRequest):
         plot_span = 50
         parsed_a = parse_scalar_value(req.a, "a")
         parsed_b = parse_scalar_value(req.b, "b")
+        parsed_e = parse_scalar_value(req.e, "e")
         parsed_x0 = parse_scalar_value(req.x0, "x0")
         parsed_y0 = parse_scalar_value(req.y0, "y0")
         parsed_h = parse_scalar_value(req.h, "h")
@@ -548,6 +724,13 @@ def solve(req: SolveRequest):
         if "y0" in requiere or "y0" in opcionales:
             if parsed_y0 is not None:
                 kwargs["y0"] = parsed_y0
+        if "e" in requiere or "e" in opcionales:
+            if parsed_e is not None:
+                kwargs["e"] = parsed_e
+        if "x0" in opcionales and parsed_x0 is not None and (
+            ("a" in requiere and "b" in requiere) or ("a" in opcionales and "b" in opcionales)
+        ):
+            kwargs["x0"] = parsed_x0
         if "h" in requiere or "h" in opcionales:
             if parsed_h is not None:
                 kwargs["h"] = parsed_h

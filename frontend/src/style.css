@@ -1104,6 +1104,104 @@ input[type="checkbox"]:checked::before {
   margin-top: 0.5rem;
 }
 
+/* ── Polynomial Calculator ───────────────────────────────────────── */
+.polynomial-layout {
+  align-items: stretch;
+}
+
+.polynomial-tabs {
+  width: 100%;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.polynomial-tabs .calc-operation-btn {
+  width: 100%;
+  padding: 0 0.7rem;
+  font-size: 0.74rem;
+  white-space: normal;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.polynomial-tabs .calc-operation-btn.wide {
+  grid-column: 1 / -1;
+}
+
+.polynomial-final {
+  border-color: rgba(6, 182, 212, 0.24);
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.polynomial-meta {
+  margin-bottom: 1rem;
+}
+
+.polynomial-forms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.polynomial-form-card {
+  min-width: 0;
+  padding: 0.95rem;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.polynomial-form-card .latex-container {
+  display: block !important;
+  justify-content: flex-start !important;
+  width: 100%;
+  margin: 0.1rem 0;
+  padding: 0.75rem !important;
+}
+
+.polynomial-coefficients {
+  margin-top: 1.1rem;
+}
+
+.polynomial-section-title {
+  margin-bottom: 0.65rem;
+  color: var(--accent-cyan);
+  font-family: var(--font-math);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.polynomial-coefficients .latex-container {
+  display: inline-flex !important;
+  justify-content: flex-start !important;
+  width: auto;
+  min-width: 0;
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
+  color: var(--accent-amber);
+  font-size: 0.95rem;
+}
+
+.poly-coefficient-code {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-family: var(--font-math);
+  font-size: 0.72rem;
+}
+
+.polynomial-steps {
+  margin-top: 1rem;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   .dashboard-layout {
@@ -1137,6 +1235,9 @@ input[type="checkbox"]:checked::before {
     grid-template-columns: 1fr;
   }
   .theory-formulas {
+    grid-template-columns: 1fr;
+  }
+  .polynomial-tabs {
     grid-template-columns: 1fr;
   }
 }

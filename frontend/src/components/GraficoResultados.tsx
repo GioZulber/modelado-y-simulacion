@@ -3,20 +3,27 @@ import React, { useEffect, useRef } from 'react';
 // Declare window.Plotly
 declare global {
   interface Window {
-    Plotly: any;
+    Plotly: {
+      newPlot: (
+        container: HTMLElement,
+        traces: Array<Record<string, unknown>>,
+        layout: Record<string, unknown>,
+        config: Record<string, unknown>
+      ) => void;
+    };
   }
 }
 
 interface PlotData {
   x: number[];
   y: number[];
-  center: number;
+  center?: number;
 }
 
 interface PlotBaseData {
   x: number[];
   y: number[];
-  label: string;
+  label?: string;
 }
 
 interface RootData {
@@ -59,7 +66,7 @@ export const GraficoResultados: React.FC<GraficoProps> = ({
   useEffect(() => {
     if (!containerRef.current || !window.Plotly) return;
 
-    const traces: any[] = [];
+    const traces: Array<Record<string, unknown>> = [];
 
     const normalizeWindow = (window?: PlotWindow | null) => {
       if (!window) return null;
@@ -152,7 +159,7 @@ export const GraficoResultados: React.FC<GraficoProps> = ({
           x: base.x,
           y: base.y,
           mode: 'lines',
-          name: base.label,
+          name: base.label ?? `Base ${i + 1}`,
           line: { color: colors[i % colors.length], width: 1.5, dash: 'dot' },
           opacity: 0.7
         });
@@ -273,7 +280,7 @@ export const GraficoResultados: React.FC<GraficoProps> = ({
     const initialY = [yMin - yPadding, yMax + yPadding];
     const initialX = [xMin, xMax];
 
-    const layout: any = {
+    const layout: Record<string, unknown> = {
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor:  'rgba(0,0,0,0)',
       font: { family: 'Inter, sans-serif', color: '#94a3b8', size: 12 },

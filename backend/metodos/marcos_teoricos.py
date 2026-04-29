@@ -221,6 +221,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx h\sum_{i=0}^{n-1} f(x_i^*) \end{aligned}",
                 "detalle": "Cada rectangulo tiene base h y altura f(x_i^*).",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=\frac{(b-a)h^2}{24}f''(\xi)\qquad E_T(e)\approx\frac{(b-a)h^2}{24}f''(e)",
+                "detalle": "La segunda expresion estima el error reemplazando el punto teorico xi por el punto ingresado e.",
+            },
         ],
         "pasos": [
             "Elegir a, b y la cantidad de subintervalos n.",
@@ -230,7 +235,7 @@ MARCOS_TEORICOS = {
         ],
         "condiciones": [
             "n debe ser mayor o igual a 1.",
-            "La funcion debe poder evaluarse en todos los puntos medios.",
+            "La funcion debe poder evaluarse en todos los puntos medios o admitir un limite finito en ellos.",
         ],
     },
     "trapecio": {
@@ -247,6 +252,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\int_a^b f(x)\,dx \approx \frac{h}{2}\left[f(a)+f(b)\right]",
                 "detalle": "Promedia las alturas de los extremos y multiplica por la base.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{h^3}{12}f''(\xi)\qquad E_T(e)\approx-\frac{h^3}{12}f''(e)",
+                "detalle": "Para la regla simple h=b-a. Se evalua f'' en e para estimar el error local.",
+            },
         ],
         "pasos": [
             "Evaluar f(a) y f(b).",
@@ -256,6 +266,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "El intervalo no puede tener longitud cero.",
             "Es exacta para funciones lineales.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "trapecio_compuesto": {
@@ -272,6 +283,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{h}{2}\Big[f(x_0)\\ &\quad +2\sum_{i=1}^{n-1}f(x_i)+f(x_n)\Big] \end{aligned}",
                 "detalle": "Los nodos interiores pesan 2 porque pertenecen a dos trapecios.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{(b-a)h^2}{12}f''(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^2}{12}f''(e)",
+                "detalle": "La forma compuesta acumula el efecto de todos los subintervalos.",
+            },
         ],
         "pasos": [
             "Dividir [a,b] en n subintervalos.",
@@ -282,6 +298,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "n debe ser mayor o igual a 1.",
             "Mejora al aumentar n para funciones suficientemente suaves.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "simpson": {
@@ -298,6 +315,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{h}{3}\left[f(a)+4f(a+h)+f(b)\right] \end{aligned}",
                 "detalle": "El punto medio recibe peso 4.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{h^5}{90}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{h^5}{90}f^{(4)}(e)",
+                "detalle": "Para Simpson simple h=(b-a)/2 y se usa la cuarta derivada.",
+            },
         ],
         "pasos": [
             "Calcular el punto medio del intervalo.",
@@ -307,7 +329,7 @@ MARCOS_TEORICOS = {
         ],
         "condiciones": [
             "Es exacta para polinomios de grado menor o igual a 3.",
-            "Requiere que la funcion sea evaluable en los tres nodos.",
+            "Requiere que la funcion sea evaluable en los tres nodos o que exista un limite finito en el nodo problematico.",
         ],
     },
     "simpson_1_3": {
@@ -324,6 +346,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{h}{3}\left[f(x_0)+4f(x_1)+f(x_2)\right] \end{aligned}",
                 "detalle": "Los pesos caracteristicos son 1, 4, 1.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{h^5}{90}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{h^5}{90}f^{(4)}(e)",
+                "detalle": "El error depende de la cuarta derivada porque la regla es exacta hasta grado 3.",
+            },
         ],
         "pasos": [
             "Tomar x0=a, x1=a+h y x2=b.",
@@ -334,6 +361,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "Es una formula cerrada de Newton-Cotes.",
             "Es exacta para polinomios hasta grado 3.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "simpson_1_3_compuesta": {
@@ -350,6 +378,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{h}{3}\Big[f(x_0)\\ &\quad +4\sum_{\substack{1\le i\le n-1\\i\ \text{impar}}}f(x_i)\\ &\quad +2\sum_{\substack{2\le i\le n-2\\i\ \text{par}}}f(x_i)+f(x_n)\Big] \end{aligned}",
                 "detalle": "Los indices impares pesan 4 y los pares interiores pesan 2.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{(b-a)h^4}{180}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^4}{180}f^{(4)}(e)",
+                "detalle": "En la regla compuesta el error baja con h^4.",
+            },
         ],
         "pasos": [
             "Elegir n par y calcular h.",
@@ -360,6 +393,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "n debe ser par.",
             "La funcion debe ser suave en el intervalo para obtener buena precision.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "simpson_3_8": {
@@ -376,6 +410,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{3h}{8}\left[f(x_0)+3f(x_1)+3f(x_2)+f(x_3)\right] \end{aligned}",
                 "detalle": "Los pesos son 1, 3, 3 y 1.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{3h^5}{80}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{3h^5}{80}f^{(4)}(e)",
+                "detalle": "Para Simpson 3/8 simple h=(b-a)/3.",
+            },
         ],
         "pasos": [
             "Dividir [a,b] en tres subintervalos iguales.",
@@ -386,6 +425,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "Es exacta para polinomios de grado menor o igual a 3.",
             "Usa un tramo de tres subintervalos.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "simpson_3_8_compuesta": {
@@ -402,6 +442,11 @@ MARCOS_TEORICOS = {
                 "latex": r"\begin{aligned} \int_a^b f(x)\,dx &\approx \frac{3h}{8}\Big[f(x_0)\\ &\quad +3\sum_{\substack{1\le i\le n-1\\3\nmid i}}f(x_i)\\ &\quad +2\sum_{\substack{3\le i\le n-3\\3\mid i}}f(x_i)+f(x_n)\Big] \end{aligned}",
                 "detalle": "Los nodos internos multiplos de 3 pesan 2; los demas pesan 3.",
             },
+            {
+                "etiqueta": "Error de truncamiento en un punto",
+                "latex": r"E_T(\xi)=-\frac{(b-a)h^4}{80}f^{(4)}(\xi)\qquad E_T(e)\approx-\frac{(b-a)h^4}{80}f^{(4)}(e)",
+                "detalle": "La expresion usa la cuarta derivada evaluada en un punto representativo.",
+            },
         ],
         "pasos": [
             "Elegir n multiplo de 3 y calcular h.",
@@ -412,6 +457,7 @@ MARCOS_TEORICOS = {
         "condiciones": [
             "n debe ser multiplo de 3.",
             "Es util cuando la cantidad de subintervalos se organiza naturalmente en bloques de tres.",
+            "Si un nodo produce una indeterminacion removible, se reemplaza f(x_i) por el limite finito.",
         ],
     },
     "monte_carlo_integral": {
