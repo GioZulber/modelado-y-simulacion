@@ -7,7 +7,7 @@ cd /d "%~dp0"
 
 IF NOT EXIST "backend\.venv" (
     echo [🐍] Creando entorno virtual de Python...
-    python -m venv backend\.venv
+    py -m venv backend\.venv
 )
 
 echo [📦] Instalando dependencias del backend...
