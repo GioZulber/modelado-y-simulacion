@@ -382,6 +382,10 @@ select optgroup {
   box-shadow: 0 0 16px rgba(245, 158, 11, 0.12);
 }
 
+.calculus-tips-btn {
+  margin-bottom: 1rem;
+}
+
 .theory-modal-backdrop {
   position: fixed;
   inset: 0;

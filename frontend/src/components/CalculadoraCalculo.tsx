@@ -137,6 +137,7 @@ export const CalculadoraCalculo: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CalculusResult | null>(null);
+  const [showDespejeTips, setShowDespejeTips] = useState(false);
   const expressionRef = useRef<HTMLInputElement>(null);
   const odeEquationRef = useRef<HTMLInputElement>(null);
 
@@ -273,6 +274,7 @@ export const CalculadoraCalculo: React.FC = () => {
   })();
 
   return (
+    <>
     <main className="dashboard-layout calculus-layout">
       <aside className="config-panel">
         <section className="card">
@@ -301,6 +303,14 @@ export const CalculadoraCalculo: React.FC = () => {
               EDO
             </button>
           </div>
+
+          <button
+            className="btn-theory calculus-tips-btn"
+            type="button"
+            onClick={() => setShowDespejeTips(true)}
+          >
+            Tips para despejar logaritmos
+          </button>
 
           {form.operation === 'integrar' && (
             <div className="calc-operation-tabs calculus-subtabs" role="tablist" aria-label="Tipo de integral">
@@ -642,5 +652,98 @@ export const CalculadoraCalculo: React.FC = () => {
         )}
       </article>
     </main>
+    {showDespejeTips && (
+      <div
+        className="theory-modal-backdrop"
+        role="presentation"
+        onClick={() => setShowDespejeTips(false)}
+      >
+        <section
+          className="theory-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="despeje-tips-title"
+          onClick={event => event.stopPropagation()}
+        >
+          <div className="theory-modal-header">
+            <div>
+              <p className="theory-kicker">Punto fijo</p>
+              <h2 id="despeje-tips-title">Tips para escribir x = g(x)</h2>
+            </div>
+            <button
+              className="theory-close-btn"
+              type="button"
+              aria-label="Cerrar tips"
+              onClick={() => setShowDespejeTips(false)}
+            >
+              X
+            </button>
+          </div>
+
+          <p className="theory-summary">
+            Para punto fijo, primero pensa la ecuacion como f(x)=0. Despues elegi
+            una funcion inversa que deje una x sola del lado izquierdo.
+          </p>
+
+          <div className="theory-section">
+            <h3>Ejemplo con logaritmo</h3>
+            <div className="theory-formulas">
+              <div className="theory-formula">
+                <div className="theory-formula-header">
+                  <span>1</span>
+                  <strong>Partir de la ecuacion igualada a cero</strong>
+                </div>
+                <RenderLatex math={'\\ln(x-1)+\\cos(x-1)=0'} />
+                <p>El objetivo es dejar una sola x del lado izquierdo.</p>
+              </div>
+
+              <div className="theory-formula">
+                <div className="theory-formula-header">
+                  <span>2</span>
+                  <strong>Aislar el logaritmo</strong>
+                </div>
+                <RenderLatex math={'\\ln(x-1)=-\\cos(x-1)'} />
+                <p>Conviene aislar el ln porque su inversa es directa.</p>
+              </div>
+
+              <div className="theory-formula">
+                <div className="theory-formula-header">
+                  <span>3</span>
+                  <strong>Aplicar exponencial</strong>
+                </div>
+                <RenderLatex math={'x-1=e^{-\\cos(x-1)}'} />
+                <p>Si ln(A)=B, entonces A=e^B.</p>
+              </div>
+
+              <div className="theory-formula">
+                <div className="theory-formula-header">
+                  <span>4</span>
+                  <strong>Terminar el despeje</strong>
+                </div>
+                <RenderLatex math={'x=1+e^{-\\cos(x-1)}'} />
+                <p>Una forma valida para iterar es g(x)=1+e^&#123;-cos(x-1)&#125;.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="theory-section">
+            <h3>Reglas rapidas</h3>
+            <div className="theory-grid">
+              <ul className="theory-list">
+                <li>Si tenes ln(A(x))=B(x), pasa a A(x)=e^&#123;B(x)&#125;.</li>
+                <li>Si tenes x-a=e^&#123;B(x)&#125;, entonces x=a+e^&#123;B(x)&#125;.</li>
+                <li>Cuida el dominio del logaritmo: en el ejemplo, x-1 &gt; 0.</li>
+              </ul>
+              <ul className="theory-list">
+                <li>No todos los despejes convergen.</li>
+                <li>Despues de elegir g(x), revisa |g'(x)| &lt; 1 cerca de la raiz.</li>
+                <li>Evita despejes con arccos/arcsin si no queres manejar ramas.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 };
